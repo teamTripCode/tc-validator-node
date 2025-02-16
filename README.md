@@ -1,99 +1,128 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Nodo Validador de Blockchain - TripCode
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## 🚀 Introducción
+El Nodo Validador es un componente crítico dentro de la red blockchain descentralizada de TripCode , diseñado para garantizar la validación eficiente y segura de transacciones, la generación de bloques y el mantenimiento del consenso en la red. Este nodo utiliza una combinación de Delegated Proof of Stake (DPoS) y Practical Byzantine Fault Tolerance (PBFT) para asegurar que las operaciones sean rápidas, confiables y resistentes a ataques.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 📚 Índice
+1. [Descripción General](#descripcion-general)
+2. [Componentes Clave](#-componentes-clave)
+3. [Requisitos del Sistema](#-requisitos-del-sistema)
+4. [Instalación y Configuración](#️-instalación-y-configuración)
+5. [Estructura del Proyecto](#-estructura-del-proyecto)
+6. [Flujo de Operación](#️-flujo-de-operación)
+<!-- 7. [Contribuciones](#descripcion-general)
+8. [Licencia](#descripcion-general) -->
 
-## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 🌟 Descripción General
+El nodo validador es responsable de:
 
-## Project setup
+ - **Validar Transacciones:** Asegura que todas las transacciones sean correctas antes de ser agregadas a la blockchain.
 
+ - **Generar Bloques:** Participa activamente en la creación de nuevos bloques mediante el algoritmo de consenso DPoS + PBFT.
+
+ - **Mantener Consenso:** Garantiza que todos los nodos en la red lleguen a un acuerdo sobre el estado actual de la blockchain.
+
+ - **Registrar Procesos Críticos:** Almacena eventos importantes como compras, pagos con tarjeta y otros registros clave de negocios.
+
+Estos nodos son seleccionados mediante un sistema de delegación y deben cumplir con requisitos de alta disponibilidad y poder de cómputo.
+
+## 🔧 Componentes Clave
+
+### 1. Red P2P
+Los nodos se conectan entre sí sin depender de un servidor central.
+Descubrimiento automático de pares mediante nodos semilla.
+Distribución de bloques y validación de transacciones en tiempo real.
+
+### 2. Almacenamiento de Blockchain
+ - Cada nodo almacena una copia completa de la blockchain.
+ - Los bloques contienen:
+   - Transacciones de smart contracts.
+   - Creación y transferencia de criptomonedas.
+   Registros críticos de negocios (creación de cuentas, emisión de facturas, pagos, etc.).
+
+### 3. Gestión de Cuentas y Smart Contracts
+ - **Cuentas de Negocios:** Crean smart contracts para emitir criptomonedas y registrar transacciones.
+
+ - **Smart Contracts de Criptomonedas:** Emiten tokens con precios dinámicos basados en oferta y demanda.
+
+ - **Smart Contracts de Registro de Procesos Críticos:** Almacenan eventos inmutables como creación de cuentas y pagos.
+
+### 4. Validación de Bloques y Transacciones
+ - Verificación de transacciones antes de ser agregadas a la blockchain.
+ - Confirmación de pagos y registro de procesos críticos.
+
+### 5. Algoritmo de Consenso
+ - DPoS: Mejora la eficiencia al limitar el número de nodos validadores.
+ - PBFT: Garantiza que todos los nodos acuerden un estado único de la blockchain.
+
+## 💻 Requisitos del Sistema
+Para ejecutar un nodo validador, se requiere:
+
+ - **Sistema Operativo:** Linux/MacOS/Windows (preferiblemente Linux para producción).
+ - **Node.js:** Versión 20.x o superior.
+ - **Redis:** Para almacenamiento temporal de datos.
+ - **Alta Disponibilidad:** El nodo debe estar siempre en línea para participar en el consenso.
+ - **Poder de Cómputo:** Procesador moderno y suficiente memoria RAM para manejar transacciones en tiempo real.
+
+## 🛠️ Instalación y Configuración
+
+### 1. Clonar el Repositorio
 ```bash
-$ npm install
+git clone https://github.com/tripcode-blockchain/validator-node.git
+cd validator-node
 ```
 
-## Compile and run the project
-
+### 2. Instalar Dependencias
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+### 3. Configurar Variables de Entorno
+Cree un archivo `.env` en la raíz del proyecto con las siguientes variables:
 
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+```env
+PORT=3000
+REDIS_URL=redis://localhost:6379
+SEED_NODES=node1.tripcode.com,node2.tripcode.com
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 4. Generar Claves Criptográficas
+Asegúrese de tener OpenSSL instalado y genere las claves públicas y privadas:
 
 ```bash
-$ npm install -g mau
-$ mau deploy
+mkdir certs
+openssl genpkey -algorithm RSA -out certs/private-key.pem
+openssl rsa -pubout -in certs/private-key.pem -out certs/public-key.pem
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 5. Iniciar el Nodo
+```bash
+npm run start:dev
+```
+El nodo validador estará disponible en http://localhost:3000.
 
-## Resources
+## 📂 Estructura del Proyecto
+```plaintext
+src/
+├── app/                # Controladores y servicios principales
+├── consensus/          # Lógica de consenso PBFT
+├── redis/              # Integración con Redis
+├── signature/          # Servicios de firma digital
+├── validator/          # Lógica específica del nodo validador
+test/                   # Pruebas unitarias y de integración
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+## ⚙️ Flujo de Operación
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 1. Conexión a la Red P2P:
+ - El nodo se conecta a otros nodos mediante el descubrimiento automático.
+ - Sincroniza la lista de validadores desde nodos semilla.
 
-## Support
+### 2. Participación en el Consenso:
+ - Si el nodo es seleccionado como líder, propone un nuevo bloque.
+ - Si no, valida el bloque propuesto por el líder.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### Registro de Transacciones:
+ - Las transacciones son verificadas y agregadas a la blockchain.
+ - Los smart contracts registran eventos críticos como pagos y creación de cuentas.
