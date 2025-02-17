@@ -3,13 +3,18 @@ import { RedisService } from "src/redis/redis.service";
 import { ConsensusState, ValidatorInfo, ValidatorStatus } from "./dto/validator.dto";
 import { Interval } from "@nestjs/schedule";
 import { SignatureService } from "src/signature/signature.service";
-
+import { Socket, io } from 'socket.io-client';
+import axios from "axios";
 
 @Injectable()
 export class ValidatorService {
     private logger = new Logger(ValidatorService.name);
     private consensusState: ConsensusState;
     private myValidatorInfo: ValidatorInfo;
+    private authenticated: boolean = false;
+    private authToken: string = null;
+    private clientId: string = null;
+    private socket: Socket = null;
 
     constructor(
         private readonly redis: RedisService,
@@ -21,7 +26,7 @@ export class ValidatorService {
     private async initializeValidator() {
         this.myValidatorInfo = {
             address: this.signature.getAddress(),
-            stake: 0, // Inicialmente sin stake
+            stake: 0,
             reputation: 0,
             lastActive: Date.now(),
             publicKey: this.signature.getPublicKey(),
@@ -29,6 +34,133 @@ export class ValidatorService {
         };
 
         await this.syncValidatorsFromSeed();
+    }
+
+    private async authenticateWithSeedNode() {
+        const seedNodes = process.env.SEED_NODES?.split(',') || [];
+
+        for (const seedNode of seedNodes) {
+            try {
+                this.logger.log(`Iniciando proceso de autenticación con nodo semilla ${seedNode}`);
+
+                // 1. Solicitar nuevo token
+                const tokenResponse = await axios.post(`${seedNode}/auth/token`);
+                if (!tokenResponse.data?.token) {
+                    throw new Error('No se pudo obtener token de autenticación');
+                }
+
+                const initialToken = tokenResponse.data.token;
+
+                // 2. Autenticar el token
+                const authResponse = await axios.post(`${seedNode}/auth/authenticate`, {
+                    token: initialToken
+                });
+
+                if (authResponse.data?.clientId) {
+                    this.authToken = initialToken;
+                    this.clientId = authResponse.data.clientId;
+                    this.authenticated = true;
+
+                    this.logger.log(`Autenticación exitosa con nodo semilla ${seedNode}`);
+                    this.logger.log(`ClientID asignado: ${this.clientId}`);
+
+                    // 3. Establecer conexión WebSocket
+                    await this.establishWebSocketConnection(seedNode);
+
+                    // 4. Sincronizar validadores
+                    await this.syncValidatorsFromSeed();
+                    break;
+                }
+            } catch (error) {
+                this.logger.error(`Error en autenticación con nodo semilla ${seedNode}: ${error.message}`);
+            }
+        }
+
+        if (!this.authenticated) {
+            this.logger.error('No se pudo autenticar con ningún nodo semilla');
+            // Reintentar después de 30 segundos
+            setTimeout(() => this.authenticateWithSeedNode(), 30000);
+        }
+    }
+
+    private async establishWebSocketConnection(seedNode: string) {
+        try {
+            // Crear conexión Socket.IO con los parámetros requeridos
+            this.socket = io(`${seedNode}`, {
+                transports: ['websocket'],
+                query: {
+                    token: this.authToken,
+                    role: 'validator'
+                }
+            });
+
+            this.socket.on('connect', () => {
+                this.logger.log('Conexión WebSocket establecida con nodo semilla');
+            });
+
+            this.socket.on('peerDiscovery', (data) => {
+                this.handlePeerDiscovery(data);
+            });
+
+            this.socket.on('disconnect', () => {
+                this.logger.warn('Conexión WebSocket perdida con nodo semilla');
+                // Reintentar conexión después de 5 segundos
+                setTimeout(() => this.establishWebSocketConnection(seedNode), 5000);
+            });
+
+            this.socket.on('FAILOVER_INITIATED', () => {
+                this.handleFailover();
+            });
+
+            this.socket.on('STATE_SYNC', (data) => {
+                this.handleStateSync(data);
+            });
+
+            // Iniciar heartbeat
+            setInterval(() => {
+                if (this.socket.connected) {
+                    this.socket.emit('heartbeat');
+                }
+            }, 30000);
+
+        } catch (error) {
+            this.logger.error(`Error estableciendo conexión WebSocket: ${error.message}`);
+        }
+    }
+
+    private handlePeerDiscovery(data: any) {
+        try {
+            if (data.peers) {
+                this.logger.log('Actualizando lista de peers del network');
+                // Actualizar lista de peers en el estado local
+            }
+            if (data.newPeer) {
+                this.logger.log(`Nuevo peer conectado: ${data.newPeer.ip}`);
+                // Agregar nuevo peer al estado local
+            }
+            if (data.disconnectedPeer) {
+                this.logger.log(`Peer desconectado: ${data.disconnectedPeer}`);
+                // Remover peer del estado local
+            }
+        } catch (error) {
+            this.logger.error(`Error procesando peer discovery: ${error.message}`);
+        }
+    }
+
+    private handleStateSync(data: any) {
+        try {
+            if (data.peers) {
+                this.logger.log('Sincronizando estado con nuevos peers');
+                // Actualizar estado local con la nueva información
+            }
+        } catch (error) {
+            this.logger.error(`Error en sincronización de estado: ${error.message}`);
+        }
+    }
+
+    private handleFailover() {
+        this.logger.warn('Failover iniciado por el nodo semilla');
+        // Implementar lógica de failover
     }
 
     private async getValidatorsFromSeed(seedNode: string): Promise<ValidatorInfo[]> {

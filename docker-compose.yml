@@ -1,0 +1,31 @@
+
+services:
+  validator_node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: validator_node
+    ports:
+      - "3001:8080"  # API HTTP
+      - "4001:8081"  # WebSocket
+    environment:
+      - NODE_ENV=production
+      - HTTP_PORT=8080
+      - WS_PORT=8081
+      - SEED_NODES=http://seed_node:8080  # Dirección del nodo semilla
+    networks:
+      - p2p_network
+    depends_on:
+      seed_node:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+networks:
+  p2p_network:
+    name: p2p_network
+    driver: bridge
