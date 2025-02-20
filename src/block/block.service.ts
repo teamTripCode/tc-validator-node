@@ -13,7 +13,9 @@ export class BlockService {
     private readonly TX_INDEX_KEY = 'blockchain:tx-index';
     private readonly SNAPSHOT_KEY = 'blockchain:snapshots';
 
-    constructor(private readonly redis: RedisService) {
+    constructor(
+        private readonly redis: RedisService
+    ) {
         this.mempool = new Map();
         this.blockHeight = 0;
         this.initializeStorage();
@@ -210,17 +212,10 @@ export class BlockService {
     private async isValidBlock(block: Block): Promise<boolean> {
         // 1. Verificar hash del bloque
         const calculatedHash = block.calculateHash();
-        if (block.hash !== calculatedHash) {
-            return false;
-        }
+        if (block.hash !== calculatedHash) return false;
 
-        // 2. Verificar índice y hash previo
-        if (block.index > 0) {
-            const previousBlock = await this.getBlockByHeight(block.index - 1);
-            if (!previousBlock || block.previousHash !== previousBlock.hash) {
-                return false;
-            }
-        }
+        const previousBlock = await this.getBlockByHeight(block.index - 1);
+        if (previousBlock && block.previousHash !== previousBlock.hash) return false;
 
         // 3. Verificar firma del validador
         // Implementar verificación de firma aquí
@@ -233,6 +228,11 @@ export class BlockService {
         this.mempool.set(transaction.processId, transaction);
     }
 
+    async getMempoolTransactions(): Promise<any[]> {
+        // Devuelve todas las transacciones en el mempool
+        return Array.from(this.mempool.values());
+    }
+
     async getTransactionBlock(txId: string): Promise<Block | undefined> {
         try {
             const blockHash = await this.redis.hGet(this.TX_INDEX_KEY, txId);
@@ -241,5 +241,18 @@ export class BlockService {
             this.logger.error('Error getting transaction block:', error);
             throw error;
         }
+    }
+
+    async createBlock(transactions: any[]): Promise<Block> {
+        const height = await this.getBlockHeight();
+        const previousBlock = await this.getBlockByHeight(height);
+        const newBlock = new Block(
+            height + 1,
+            new Date().toISOString(),
+            transactions,
+            [],
+            previousBlock?.hash || '0'
+        );
+        return newBlock;
     }
 }

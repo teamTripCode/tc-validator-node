@@ -1,6 +1,7 @@
 import * as crypto from 'crypto'
 import { Injectable } from '@nestjs/common';
 import { BlockType, IBlock, ICriticalProcess, ITransaction } from './dto/block.dto';
+import { MemPoolService } from 'src/mempool/mempool.service';
 
 @Injectable()
 export class Block implements IBlock {

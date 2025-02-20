@@ -5,6 +5,9 @@ import { Interval } from "@nestjs/schedule";
 import { SignatureService } from "src/signature/signature.service";
 import { Socket, io } from 'socket.io-client';
 import axios from "axios";
+import { BlockService } from "src/block/block.service";
+import { Block } from "src/block/block";
+import { ConsensusService } from "src/consensus/consensus.service";
 
 @Injectable()
 export class ValidatorService {
@@ -28,6 +31,8 @@ export class ValidatorService {
     constructor(
         private readonly redis: RedisService,
         private readonly signature: SignatureService,
+        private readonly block: BlockService,
+        private readonly consensus: ConsensusService
     ) {
         this.initializeValidator();
     }
@@ -288,7 +293,27 @@ export class ValidatorService {
      * Proposes a new block when this validator is the leader.
      */
     private async proposeNewBlock() {
-        // Implement logic to propose a new block
+        try {
+            // Obtener las transacciones del mempool
+            const transactions = await this.block.getMempoolTransactions();
+
+            // Obtener la altura actual del bloque y calcular la nueva altura
+            const currentHeight = await this.block.getBlockHeight();
+            const newHeight = currentHeight + 1;
+
+            // Crear un nuevo bloque
+            const newBlock = new Block(
+                newHeight,
+                new Date().toISOString(),
+                transactions
+            );
+
+            // Proponer el nuevo bloque al consenso
+            await this.consensus.proposeBlock(newBlock);
+            this.logger.log(`Proposed new block with hash: ${newBlock.hash}`);
+        } catch (error) {
+            this.logger.error(`Error proposing new block: ${error.message}`);
+        }
     }
 
     /**

@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Block } from 'src/block/block';
+import { BlockService } from 'src/block/block.service';
 import { SignatureService } from 'src/signature/signature.service';
 
 @Injectable()
@@ -9,7 +11,10 @@ export class ConsensusService {
   private prepareMessages: Map<string, ConsensusMessage[]> = new Map();
   private commitMessages: Map<string, ConsensusMessage[]> = new Map();
 
-  constructor() { }
+  constructor(
+    private readonly signature: SignatureService,
+    private readonly block: BlockService,
+  ) { }
 
   /**
    * Handles incoming consensus messages, verifies their signatures, 
@@ -135,6 +140,26 @@ export class ConsensusService {
    * @param hash - The block hash.
    */
   private async finalizeBlock(height: number, hash: string) {
-    // Implement logic to finalize the block
+    const block = await this.block.getBlock(hash);
+    if (block) {
+      await this.block.saveBlock(block);
+      this.logger.log(`Block ${hash} finalized and saved`);
+    }
+  }
+
+  async proposeBlock(block: Block) {
+    const message: ConsensusMessage = {
+      type: ConsensusMessageType.PREPARE,
+      blockHeight: block.index,
+      blockHash: block.hash,
+      validator: this.signature.getAddress(),
+      signature: this.signature.signMessage(block.hash),
+    };
+    this.broadcastPrepare(message);
+  }
+
+  private async broadcastPrepare(message: ConsensusMessage) {
+    // Implementa la lógica para enviar el mensaje PREPARE a otros validadores
+    console.log(`Broadcasting PREPARE message for block ${message.blockHash}`);
   }
 }
