@@ -6,17 +6,11 @@ export class RedisService {
   private logger = new Logger(RedisService.name);
   private redisClient: RedisClientType;
 
-  /**
-   * Constructor initializes the Redis client and sets up event handlers.
-   */
   constructor() {
     this.redisClient = createClient({ url: process.env.REDIS_URL });
     this.setupRedisEventHandlers();
   }
 
-  /**
-   * Sets up event handlers for Redis client events such as 'error' and 'connect'.
-   */
   private setupRedisEventHandlers() {
     this.redisClient.on('error', (err) => {
       this.logger.error(`Redis Error: ${err.message}`);
@@ -27,10 +21,6 @@ export class RedisService {
     });
   }
 
-  /**
-   * Establishes a connection to the Redis server.
-   * Logs an error if the connection fails.
-   */
   async connectToRedis() {
     try {
       await this.redisClient.connect();
@@ -39,10 +29,15 @@ export class RedisService {
     }
   }
 
-  /**
-   * Stores validator peers in Redis using a hash structure.
-   * @param peers - A record of IP addresses and their corresponding metadata.
-   */
+  async disconnect() {
+    try {
+      await this.redisClient.quit();
+      this.logger.log('Disconnected from Redis');
+    } catch (error) {
+      this.logger.error(`Error disconnecting from Redis: ${error.message}`);
+    }
+  }
+
   async storeValidatorPeers(peers: Record<string, string>) {
     try {
       await this.redisClient.hSet('validatorPeers', peers);
@@ -51,10 +46,6 @@ export class RedisService {
     }
   }
 
-  /**
-   * Removes a validator peer from Redis by its IP address.
-   * @param ip - The IP address of the peer to remove.
-   */
   async removeValidatorPeer(ip: string) {
     try {
       await this.redisClient.hDel('validatorPeers', ip);
@@ -63,11 +54,6 @@ export class RedisService {
     }
   }
 
-  /**
-   * Retrieves all fields and values of a hash stored in Redis.
-   * @param key - The key of the hash to retrieve.
-   * @returns A record of fields and values, or an empty object if an error occurs.
-   */
   async hGetAll(key: string): Promise<Record<string, string>> {
     try {
       return await this.redisClient.hGetAll(key);
@@ -77,12 +63,6 @@ export class RedisService {
     }
   }
 
-  /**
-   * Sets a field-value pair in a hash stored in Redis.
-   * @param key - The key of the hash.
-   * @param field - The field to set.
-   * @param value - The value to assign to the field.
-   */
   async hSet(key: string, field: string, value: string): Promise<void> {
     try {
       await this.redisClient.hSet(key, field, value);
@@ -90,4 +70,57 @@ export class RedisService {
       this.logger.error(`Error in hSet(${key}, ${field}): ${error.message}`);
     }
   }
+
+  async hExists(key: string, field: string): Promise<boolean> {
+    try {
+      return await this.redisClient.hExists(key, field);
+    } catch (error) {
+      this.logger.error(`Error in hExists(${key}, ${field}): ${error.message}`);
+      return false;
+    }
+  }
+
+  async hGet(key: string, field: string): Promise<string | null> {
+    try {
+      return await this.redisClient.hGet(key, field);
+    } catch (error) {
+      this.logger.error(`Error in hGet(${key}, ${field}): ${error.message}`);
+      return null;
+    }
+  }
+
+  async get(key: string): Promise<string | null> {
+    try {
+      return await this.redisClient.get(key);
+    } catch (error) {
+      this.logger.error(`Error in get(${key}): ${error.message}`);
+      return null;
+    }
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    try {
+      await this.redisClient.set(key, value);
+    } catch (error) {
+      this.logger.error(`Error in set(${key}, ${value}): ${error.message}`);
+    }
+  }
+
+  async del(key: string): Promise<void> {
+    try {
+      await this.redisClient.del(key);
+    } catch (error) {
+      this.logger.error(`Error in del(${key}): ${error.message}`);
+    }
+  }
+
+  async ping(): Promise<string> {
+    try {
+      return await this.redisClient.ping();
+    } catch (error) {
+      this.logger.error(`Error in ping(): ${error.message}`);
+      return 'Error';
+    }
+  }
+
 }
