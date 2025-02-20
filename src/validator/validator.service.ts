@@ -9,13 +9,22 @@ import axios from "axios";
 @Injectable()
 export class ValidatorService {
     private logger = new Logger(ValidatorService.name);
+
+    // Current consensus state and validator information
     private consensusState: ConsensusState;
     private myValidatorInfo: ValidatorInfo;
+
+    // Authentication and connection-related properties
     private authenticated: boolean = false;
     private authToken: string = null;
     private clientId: string = null;
     private socket: Socket = null;
 
+    /**
+     * Constructor initializes the service with dependencies.
+     * @param redis - Redis service for storing and retrieving validator data.
+     * @param signature - Signature service for cryptographic operations.
+     */
     constructor(
         private readonly redis: RedisService,
         private readonly signature: SignatureService,
@@ -23,6 +32,9 @@ export class ValidatorService {
         this.initializeValidator();
     }
 
+    /**
+     * Initializes the validator by setting up its metadata and syncing with seed nodes.
+     */
     private async initializeValidator() {
         this.myValidatorInfo = {
             address: this.signature.getAddress(),
@@ -32,60 +44,59 @@ export class ValidatorService {
             publicKey: this.signature.getPublicKey(),
             status: ValidatorStatus.STANDBY
         };
-
         await this.syncValidatorsFromSeed();
     }
 
+    /**
+     * Authenticates the validator with a seed node to obtain a token and client ID.
+     */
     private async authenticateWithSeedNode() {
         const seedNodes = process.env.SEED_NODES?.split(',') || [];
-
         for (const seedNode of seedNodes) {
             try {
-                this.logger.log(`Iniciando proceso de autenticación con nodo semilla ${seedNode}`);
-
-                // 1. Solicitar nuevo token
+                this.logger.log(`Starting authentication process with seed node ${seedNode}`);
+                // Step 1: Request a new token
                 const tokenResponse = await axios.post(`${seedNode}/auth/token`);
                 if (!tokenResponse.data?.token) {
-                    throw new Error('No se pudo obtener token de autenticación');
+                    throw new Error('Failed to obtain authentication token');
                 }
-
                 const initialToken = tokenResponse.data.token;
 
-                // 2. Autenticar el token
+                // Step 2: Authenticate the token
                 const authResponse = await axios.post(`${seedNode}/auth/authenticate`, {
                     token: initialToken
                 });
-
                 if (authResponse.data?.clientId) {
                     this.authToken = initialToken;
                     this.clientId = authResponse.data.clientId;
                     this.authenticated = true;
+                    this.logger.log(`Authentication successful with seed node ${seedNode}`);
+                    this.logger.log(`Assigned ClientID: ${this.clientId}`);
 
-                    this.logger.log(`Autenticación exitosa con nodo semilla ${seedNode}`);
-                    this.logger.log(`ClientID asignado: ${this.clientId}`);
-
-                    // 3. Establecer conexión WebSocket
+                    // Step 3: Establish WebSocket connection
                     await this.establishWebSocketConnection(seedNode);
 
-                    // 4. Sincronizar validadores
+                    // Step 4: Sync validators
                     await this.syncValidatorsFromSeed();
                     break;
                 }
             } catch (error) {
-                this.logger.error(`Error en autenticación con nodo semilla ${seedNode}: ${error.message}`);
+                this.logger.error(`Error authenticating with seed node ${seedNode}: ${error.message}`);
             }
         }
-
         if (!this.authenticated) {
-            this.logger.error('No se pudo autenticar con ningún nodo semilla');
-            // Reintentar después de 30 segundos
+            this.logger.error('Failed to authenticate with any seed node');
+            // Retry after 30 seconds
             setTimeout(() => this.authenticateWithSeedNode(), 30000);
         }
     }
 
+    /**
+     * Establishes a WebSocket connection with the seed node for real-time communication.
+     * @param seedNode - The URL of the seed node.
+     */
     private async establishWebSocketConnection(seedNode: string) {
         try {
-            // Crear conexión Socket.IO con los parámetros requeridos
             this.socket = io(`${seedNode}`, {
                 transports: ['websocket'],
                 query: {
@@ -95,7 +106,7 @@ export class ValidatorService {
             });
 
             this.socket.on('connect', () => {
-                this.logger.log('Conexión WebSocket establecida con nodo semilla');
+                this.logger.log('WebSocket connection established with seed node');
             });
 
             this.socket.on('peerDiscovery', (data) => {
@@ -103,8 +114,8 @@ export class ValidatorService {
             });
 
             this.socket.on('disconnect', () => {
-                this.logger.warn('Conexión WebSocket perdida con nodo semilla');
-                // Reintentar conexión después de 5 segundos
+                this.logger.warn('WebSocket connection lost with seed node');
+                // Retry connection after 5 seconds
                 setTimeout(() => this.establishWebSocketConnection(seedNode), 5000);
             });
 
@@ -116,94 +127,114 @@ export class ValidatorService {
                 this.handleStateSync(data);
             });
 
-            // Iniciar heartbeat
+            // Start heartbeat interval
             setInterval(() => {
                 if (this.socket.connected) {
                     this.socket.emit('heartbeat');
                 }
             }, 30000);
-
         } catch (error) {
-            this.logger.error(`Error estableciendo conexión WebSocket: ${error.message}`);
+            this.logger.error(`Error establishing WebSocket connection: ${error.message}`);
         }
     }
 
+    /**
+     * Handles peer discovery events to update the list of connected peers.
+     * @param data - Peer discovery data containing new or disconnected peers.
+     */
     private handlePeerDiscovery(data: any) {
         try {
             if (data.peers) {
-                this.logger.log('Actualizando lista de peers del network');
-                // Actualizar lista de peers en el estado local
+                this.logger.log('Updating network peer list');
+                // Update local peer list
             }
             if (data.newPeer) {
-                this.logger.log(`Nuevo peer conectado: ${data.newPeer.ip}`);
-                // Agregar nuevo peer al estado local
+                this.logger.log(`New peer connected: ${data.newPeer.ip}`);
+                // Add new peer to local state
             }
             if (data.disconnectedPeer) {
-                this.logger.log(`Peer desconectado: ${data.disconnectedPeer}`);
-                // Remover peer del estado local
+                this.logger.log(`Peer disconnected: ${data.disconnectedPeer}`);
+                // Remove peer from local state
             }
         } catch (error) {
-            this.logger.error(`Error procesando peer discovery: ${error.message}`);
+            this.logger.error(`Error processing peer discovery: ${error.message}`);
         }
     }
 
+    /**
+     * Handles state synchronization events to update the validator's state.
+     * @param data - State synchronization data containing updated peer information.
+     */
     private handleStateSync(data: any) {
         try {
             if (data.peers) {
-                this.logger.log('Sincronizando estado con nuevos peers');
-                // Actualizar estado local con la nueva información
+                this.logger.log('Synchronizing state with new peers');
+                // Update local state with new information
             }
         } catch (error) {
-            this.logger.error(`Error en sincronización de estado: ${error.message}`);
+            this.logger.error(`Error during state synchronization: ${error.message}`);
         }
     }
 
+    /**
+     * Handles failover events initiated by the seed node.
+     */
     private handleFailover() {
-        this.logger.warn('Failover iniciado por el nodo semilla');
-        // Implementar lógica de failover
+        this.logger.warn('Failover initiated by seed node');
+        // Implement failover logic here
     }
 
+    /**
+     * Fetches the list of validators from a seed node.
+     * @param seedNode - The URL of the seed node.
+     * @returns A list of validators.
+     */
     private async getValidatorsFromSeed(seedNode: string): Promise<ValidatorInfo[]> {
-        // Implementar lógica para obtener validadores del nodo semilla
-        // Usar HTTP/WebSocket según configuración
+        // Implement logic to fetch validators from the seed node via HTTP/WebSocket
         return [];
     }
 
+    /**
+     * Synchronizes the validator set with the seed nodes.
+     */
     async syncValidatorsFromSeed() {
         try {
             const seedNodes = process.env.SEED_NODES?.split(',') || [];
             for (const seedNode of seedNodes) {
                 try {
-                    // Intentar obtener lista de validadores del nodo semilla
                     const validators = await this.getValidatorsFromSeed(seedNode);
                     if (validators) {
                         await this.updateValidatorSet(validators);
                         break;
                     }
                 } catch (error) {
-                    this.logger.warn(`Error al sincronizar con nodo semilla ${seedNode}`);
+                    this.logger.warn(`Error synchronizing with seed node ${seedNode}`);
                 }
             }
         } catch (error) {
-            this.logger.error('Error en sincronización inicial de validadores');
+            this.logger.error('Error during initial validator synchronization');
         }
     }
 
-    @Interval(30000) // Cada 30 segundos
+    /**
+     * Updates the validator set periodically (every 30 seconds).
+     * @param newValidators - Optional list of new validators to update the set.
+     */
+    @Interval(30000)
     async updateValidatorSet(newValidators?: ValidatorInfo[]) {
         try {
-            // Si no recibimos nuevos validadores, obtenerlos de Redis
+            // If no new validators are provided, fetch them from Redis
             if (!newValidators) {
                 const validatorsData = await this.redis.hGetAll('validators');
                 newValidators = Object.values(validatorsData).map(v => JSON.parse(v));
             }
 
-            // Actualizar el conjunto de validadores
+            // Update the validator set
             this.consensusState.validatorsSet = new Map(
                 newValidators.map(v => [v.address, v])
             );
 
-            // Verificar si somos parte del conjunto de validadores
+            // Check if this validator is part of the active set
             const amIValidator = this.consensusState.validatorsSet.has(this.myValidatorInfo.address);
             if (amIValidator) {
                 this.myValidatorInfo.status = ValidatorStatus.ACTIVE;
@@ -211,25 +242,28 @@ export class ValidatorService {
                 this.myValidatorInfo.status = ValidatorStatus.STANDBY;
             }
 
+            // Store updated validator info in Redis
             await this.redis.hSet(
                 'validators',
                 this.myValidatorInfo.address,
                 JSON.stringify(this.myValidatorInfo)
             );
         } catch (error) {
-            this.logger.error(`Error actualizando conjunto de validadores: ${error.message}`);
+            this.logger.error(`Error updating validator set: ${error.message}`);
         }
     }
 
-    @Interval(5000) // Cada 5 segundos
+    /**
+     * Participates in the consensus process periodically (every 5 seconds).
+     */
+    @Interval(5000)
     async participateInConsensus() {
         if (this.myValidatorInfo.status !== ValidatorStatus.ACTIVE) return;
-
         try {
-            // Actualizar estado del validador
+            // Update validator activity timestamp
             this.myValidatorInfo.lastActive = Date.now();
 
-            // Participar en la ronda de consenso actual
+            // Participate in the current consensus round
             const isLeader = this.checkIfLeader();
             if (isLeader) {
                 await this.proposeNewBlock();
@@ -237,21 +271,30 @@ export class ValidatorService {
                 await this.validateProposedBlock();
             }
         } catch (error) {
-            this.logger.error(`Error en ronda de consenso: ${error.message}`);
+            this.logger.error(`Error during consensus round: ${error.message}`);
         }
     }
 
+    /**
+     * Checks if this validator is the leader for the current consensus round.
+     * @returns True if this validator is the leader, false otherwise.
+     */
     private checkIfLeader(): boolean {
-        // Implementar lógica DPoS para determinar si somos el líder
-        // de la ronda actual
+        // Implement DPoS logic to determine if this validator is the leader
         return false;
     }
 
+    /**
+     * Proposes a new block when this validator is the leader.
+     */
     private async proposeNewBlock() {
-        // Implementar lógica para proponer nuevo bloque cuando somos líder
+        // Implement logic to propose a new block
     }
 
+    /**
+     * Validates a proposed block using PBFT consensus logic.
+     */
     private async validateProposedBlock() {
-        // Implementar lógica PBFT para validar bloque propuesto
+        // Implement PBFT logic to validate the proposed block
     }
 }

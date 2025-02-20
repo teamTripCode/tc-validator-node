@@ -1,23 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SignatureService } from 'src/signature/signature.service';
 
-
 @Injectable()
 export class ConsensusService {
   private readonly logger = new Logger(ConsensusService.name);
+
+  // Maps to store PREPARE and COMMIT messages for each block (keyed by blockHeight:blockHash)
   private prepareMessages: Map<string, ConsensusMessage[]> = new Map();
   private commitMessages: Map<string, ConsensusMessage[]> = new Map();
 
   constructor() { }
 
+  /**
+   * Handles incoming consensus messages, verifies their signatures, 
+   * and processes them based on their type.
+   * @param message - The consensus message to process.
+   */
   async handleConsensusMessage(message: ConsensusMessage): Promise<void> {
     try {
-      // Verificar firma del mensaje
+      // Verify the message signature before processing
       if (!this.verifyMessageSignature(message)) {
-        this.logger.warn(`Mensaje de consenso con firma inválida de ${message.validator}`);
+        this.logger.warn(`Invalid signature in consensus message from ${message.validator}`);
         return;
       }
 
+      // Process the message based on its type
       switch (message.type) {
         case ConsensusMessageType.PREPARE:
           await this.handlePrepareMessage(message);
@@ -30,10 +37,15 @@ export class ConsensusService {
           break;
       }
     } catch (error) {
-      this.logger.error(`Error procesando mensaje de consenso: ${error.message}`);
+      this.logger.error(`Error processing consensus message: ${error.message}`);
     }
   }
 
+  /**
+   * Handles a PREPARE message by storing it and checking if enough PREPARE messages
+   * have been received to proceed with broadcasting a COMMIT.
+   * @param message - The PREPARE consensus message.
+   */
   private async handlePrepareMessage(message: ConsensusMessage) {
     const key = `${message.blockHeight}:${message.blockHash}`;
     if (!this.prepareMessages.has(key)) {
@@ -41,12 +53,17 @@ export class ConsensusService {
     }
     this.prepareMessages.get(key).push(message);
 
-    // Verificar si tenemos suficientes mensajes PREPARE
+    // Check if we have enough PREPARE messages to broadcast a COMMIT
     if (this.prepareMessages.get(key).length >= this.getRequiredPrepares()) {
       await this.broadcastCommit(message.blockHeight, message.blockHash);
     }
   }
 
+  /**
+   * Handles a COMMIT message by storing it and checking if enough COMMIT messages
+   * have been received to finalize the block.
+   * @param message - The COMMIT consensus message.
+   */
   private async handleCommitMessage(message: ConsensusMessage) {
     const key = `${message.blockHeight}:${message.blockHash}`;
     if (!this.commitMessages.has(key)) {
@@ -54,41 +71,70 @@ export class ConsensusService {
     }
     this.commitMessages.get(key).push(message);
 
-    // Verificar si tenemos suficientes mensajes COMMIT
+    // Check if we have enough COMMIT messages to finalize the block
     if (this.commitMessages.get(key).length >= this.getRequiredCommits()) {
       await this.finalizeBlock(message.blockHeight, message.blockHash);
     }
   }
 
+  /**
+   * Placeholder for handling VIEW_CHANGE messages in PBFT consensus.
+   * @param message - The VIEW_CHANGE consensus message.
+   */
   private async handleViewChangeMessage(message: ConsensusMessage) {
-    // Implementar lógica de cambio de vista PBFT
+    // Implement PBFT view change logic here
   }
 
+  /**
+   * Calculates the number of required PREPARE messages (2f + 1).
+   * @returns The minimum number of PREPARE messages needed for consensus.
+   */
   private getRequiredPrepares(): number {
-    // Calcular 2f + 1 donde f es el número máximo de nodos maliciosos tolerados
     return Math.floor(this.getTotalValidators() * 2 / 3) + 1;
   }
 
+  /**
+   * Calculates the number of required COMMIT messages (same as PREPARE).
+   * @returns The minimum number of COMMIT messages needed for consensus.
+   */
   private getRequiredCommits(): number {
-    // Similar a PREPARE, necesitamos 2f + 1 commits
     return this.getRequiredPrepares();
   }
 
+  /**
+   * Placeholder for retrieving the total number of active validators.
+   * @returns The total number of validators in the network.
+   */
   private getTotalValidators(): number {
-    // Obtener número total de validadores activos
-    return 0; // Implementar
+    // Implement logic to fetch the total number of active validators
+    return 0;
   }
 
+  /**
+   * Verifies the signature of a consensus message.
+   * @param message - The consensus message to verify.
+   * @returns True if the signature is valid, false otherwise.
+   */
   private verifyMessageSignature(message: ConsensusMessage): boolean {
-    // Verificar firma del mensaje usando el servicio de firmas
-    return true; // Implementar
+    // Implement signature verification logic using the SignatureService
+    return true;
   }
 
+  /**
+   * Broadcasts a COMMIT message to all validators.
+   * @param height - The block height.
+   * @param hash - The block hash.
+   */
   private async broadcastCommit(height: number, hash: string) {
-    // Enviar mensaje COMMIT a todos los validadores
+    // Implement logic to broadcast a COMMIT message
   }
 
+  /**
+   * Finalizes a block when enough COMMIT messages have been received.
+   * @param height - The block height.
+   * @param hash - The block hash.
+   */
   private async finalizeBlock(height: number, hash: string) {
-    // Finalizar el bloque cuando tenemos suficientes COMMIT
+    // Implement logic to finalize the block
   }
 }
