@@ -6,7 +6,6 @@ import { SignatureService } from "src/signature/signature.service";
 import { Socket, io } from 'socket.io-client';
 import axios from "axios";
 import { BlockService } from "src/block/block.service";
-import { Block } from "src/block/block";
 import { ConsensusService } from "src/consensus/consensus.service";
 
 /**
@@ -365,23 +364,8 @@ export class ValidatorService {
             // Get transactions from the mempool
             const transactions = await this.block.getMempoolTransactions();
 
-            // Get current block height and calculate new height
-            const currentHeight = await this.block.getBlockHeight();
-            const newHeight = currentHeight + 1;
-
-            // Create a new block
-            /** 
-             * The block creation process includes:
-             * 1. Selecting transactions from the mempool
-             * 2. Creating a block with appropriate metadata
-             * 3. Signing the block with the validator's private key (done in consensus service)
-             */
-            const newBlock = new Block(
-                newHeight,
-                new Date().toISOString(),
-                transactions
-            );
-
+            const newBlock = await this.block.proposeNewBlock(transactions);
+            
             // Propose the new block to the consensus
             await this.consensus.proposeBlock(newBlock);
             this.logger.log(`Proposed new block with hash: ${newBlock.hash}`);

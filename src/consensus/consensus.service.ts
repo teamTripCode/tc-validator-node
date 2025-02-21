@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Block } from 'src/block/block';
 import { BlockService } from 'src/block/block.service';
+import { IBlock } from 'src/block/dto/block.dto';
 import { SignatureService } from 'src/signature/signature.service';
 import { TripcoinService } from 'src/tripcoin/tripcoin.service';
 
@@ -156,7 +156,7 @@ export class ConsensusService {
    * Proposes a new block by broadcasting a PREPARE message.
    * @param block - The block to propose.
    */
-  async proposeBlock(block: Block) {
+  async proposeBlock(block: IBlock) {
     const message: ConsensusMessage = {
       type: ConsensusMessageType.PREPARE,
       blockHeight: block.index,

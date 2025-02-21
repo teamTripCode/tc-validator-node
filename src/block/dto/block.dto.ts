@@ -1,5 +1,3 @@
-import { TripcoinService } from "src/tripcoin/tripcoin.service";
-
 /**
  * Enum representing the type of a block in the blockchain.
  * Blocks can either contain transactions or critical processes.
@@ -9,9 +7,6 @@ export enum BlockType {
     CRITICAL_PROCESS = 'CRITICAL_PROCESS' // Indicates a block containing critical processes
 }
 
-/**
- * Interface defining the structure of a block in the blockchain.
- */
 export interface IBlock {
     index: number; // The block's position in the blockchain
     timestamp: string; // Timestamp of when the block was created
@@ -24,7 +19,7 @@ export interface IBlock {
     signature: string; // Validator's signature for proof-of-authority
     validator: string; // Address or identifier of the validator who forged the block
     totalFees?: number; // Total de fees generados por las transacciones (nueva propiedad)
-    tripcoin: TripcoinService; // Servicio de tripcoin para calcular fees
+    // tripcoin: TripcoinService; // Servicio de tripcoin para calcular fees
 
     /**
      * Method to calculate the hash of the block.
