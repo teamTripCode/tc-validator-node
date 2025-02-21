@@ -2,6 +2,7 @@ import * as crypto from 'crypto'
 import { Injectable } from '@nestjs/common';
 import { BlockType, IBlock, ICriticalProcess, ITransaction } from './dto/block.dto';
 import { MemPoolService } from 'src/mempool/mempool.service';
+import { TripcoinService } from 'src/tripcoin/tripcoin.service';
 
 @Injectable()
 export class Block implements IBlock {
@@ -15,6 +16,8 @@ export class Block implements IBlock {
     nonce: number; // Nonce used in mining to achieve the desired difficulty
     signature: string; // Validator's signature for proof-of-authority
     validator: string; // Address or identifier of the validator who forged the block
+    totalFees?: number; // Nueva propiedad para almacenar el total de fees
+    tripcoin: TripcoinService;
 
     /**
      * Constructor initializes a new block with the provided data.
@@ -28,11 +31,13 @@ export class Block implements IBlock {
     constructor(
         index: number,
         timestamp: string,
+        tripcoin: TripcoinService,
         transactions?: ITransaction[],
         criticalProcesses?: ICriticalProcess[],
         previousHash = '',
-        signature: string = ''
+        signature: string = '',
     ) {
+        this.tripcoin = tripcoin;
         this.index = index;
         this.timestamp = timestamp;
         this.transactions = transactions;
@@ -49,6 +54,11 @@ export class Block implements IBlock {
         this.validator = ''; // Validator is set during block forging
         this.hash = this.calculateHash(); // Calculate the initial hash of the block
         this.type = transactions ? BlockType.TRANSACTION : BlockType.CRITICAL_PROCESS; // Determine block type
+
+        if (transactions) {
+            this.totalFees = transactions.reduce((sum, tx) => 
+            sum + this.tripcoin.calculateTransactionFee(tx.gasLimit), 0)
+        }
     }
 
     /**

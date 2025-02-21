@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Interval } from "@nestjs/schedule";
+import { TripcoinService } from "src/tripcoin/tripcoin.service";
 
 /**
  * MemPoolService manages the memory pool (mempool) of pending transactions.
@@ -20,6 +21,8 @@ export class MemPoolService {
 
     // Map to track the timestamp of when each transaction was added to the mempool
     private txTimes: Map<string, number> = new Map();
+
+    constructor(private readonly tripcoin: TripcoinService) {}
 
     /**
      * Adds a transaction to the mempool after validating it.
@@ -58,8 +61,10 @@ export class MemPoolService {
             return false;
         }
 
-        // Additional validations can be implemented here...
-        return true;
+        const fee = this.tripcoin.calculateTransactionFee(tx.gasLimit);
+        const valid = await this.tripcoin.validateTransaction(tx.from, tx.amount, fee);
+
+        return valid;
     }
 
     /**

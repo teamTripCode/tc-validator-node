@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Block } from 'src/block/block';
 import { BlockService } from 'src/block/block.service';
 import { SignatureService } from 'src/signature/signature.service';
+import { TripcoinService } from 'src/tripcoin/tripcoin.service';
 
 /**
  * ConsensusService manages the consensus mechanism for the blockchain, ensuring agreement among validators.
@@ -21,6 +22,7 @@ export class ConsensusService {
   constructor(
     private readonly signature: SignatureService,
     private readonly block: BlockService,
+    private readonly tripcoin: TripcoinService,
   ) { }
 
   /**
@@ -145,6 +147,7 @@ export class ConsensusService {
     const block = await this.block.getBlock(hash);
     if (block) {
       await this.block.saveBlock(block);
+      await this.tripcoin.distributeBlockReward(block.index);
       this.logger.log(`Block ${hash} finalized and saved`);
     }
   }

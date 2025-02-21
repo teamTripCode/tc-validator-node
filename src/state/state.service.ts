@@ -74,4 +74,21 @@ export class StateService {
     private async saveState(state: any): Promise<void> {
         await this.redis.set(this.STATE_KEY, JSON.stringify(state));
     }
+
+    async getAccountBalance(address: string): Promise<number> {
+        const state = await this.getCurrentState();
+        return state.balances[address] || 0;
+    }
+
+    async setBalance(address: string, amount: number): Promise<void> {
+        const state = await this.getCurrentState();
+        state.balances[address] = amount;
+        await this.saveState(state);
+    }
+
+    async incrementBalance(address: string, amount: number): Promise<void> {
+        const state = await this.getCurrentState();
+        state.balances[address] = (state.balances[address] || 0) + amount;
+        await this.saveState(state);
+    }
 }

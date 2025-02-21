@@ -1,3 +1,5 @@
+import { TripcoinService } from "src/tripcoin/tripcoin.service";
+
 /**
  * Enum representing the type of a block in the blockchain.
  * Blocks can either contain transactions or critical processes.
@@ -21,6 +23,8 @@ export interface IBlock {
     nonce: number; // Nonce used in mining to achieve the desired difficulty
     signature: string; // Validator's signature for proof-of-authority
     validator: string; // Address or identifier of the validator who forged the block
+    totalFees?: number; // Total de fees generados por las transacciones (nueva propiedad)
+    tripcoin: TripcoinService; // Servicio de tripcoin para calcular fees
 
     /**
      * Method to calculate the hash of the block.
@@ -61,6 +65,7 @@ export interface ITransaction {
     data: BlockDataTransaction; // Detailed transaction data
     timestamp: string; // Timestamp of when the transaction was created
     signature: string; // Signature of the transaction for validation
+    gasLimit: number; // Límite de gas para la transacción (nueva propiedad)
 }
 
 /**

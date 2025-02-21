@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
 import { Block } from './block';
+import { TripcoinService } from 'src/tripcoin/tripcoin.service';
 /**
  * BlockService is responsible for managing blockchain operations including block creation, validation, storage, and retrieval.
  * It interacts with Redis for persistent storage and maintains an in-memory mempool for pending transactions.
@@ -16,7 +17,8 @@ export class BlockService {
     private readonly SNAPSHOT_KEY = 'blockchain:snapshots'; // Redis key for storing periodic snapshot
 
     constructor(
-        private readonly redis: RedisService // Dependency injection for Redis service
+        private readonly redis: RedisService, // Dependency injection for Redis service
+        private readonly tripcoin: TripcoinService
     ) {
         this.mempool = new Map(); // Initialize mempool
         this.blockHeight = 0; // Start with a height of 0
@@ -43,6 +45,7 @@ export class BlockService {
         const genesisBlock = new Block(
             0,
             new Date().toISOString(),
+            this.tripcoin,
             [], // No transactions in genesis block
             [], // No critical processes in genesis block
             '0', // Previous hash is '0' for genesis block
@@ -276,20 +279,23 @@ export class BlockService {
         }
     }
 
-    
-    /**
-     * Creates a new block with the specified transactions and returns it.
-     */
+
     async createBlock(transactions: any[]): Promise<Block> {
+ 
+        // Obtener la altura actual del blockchain
         const height = await this.getBlockHeight();
         const previousBlock = await this.getBlockByHeight(height);
+
+        // Crear un nuevo bloque con los argumentos en el orden correcto
         const newBlock = new Block(
-            height + 1,
-            new Date().toISOString(),
-            transactions,
-            [],
-            previousBlock?.hash || '0'
+            height + 1, // Índice del bloque
+            new Date().toISOString(), // Timestamp
+            this.tripcoin, // Servicio Tripcoin (tercer argumento)
+            transactions, // Transacciones (cuarto argumento)
+            [], // Procesos críticos (quinto argumento)
+            previousBlock?.hash || '0' // Hash del bloque anterior
         );
+
         return newBlock;
     }
 }
