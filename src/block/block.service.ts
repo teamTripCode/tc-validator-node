@@ -1,73 +1,80 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
 import { Block } from './block';
-
+/**
+ * BlockService is responsible for managing blockchain operations including block creation, validation, storage, and retrieval.
+ * It interacts with Redis for persistent storage and maintains an in-memory mempool for pending transactions.
+ */
 @Injectable()
 export class BlockService {
     private readonly logger = new Logger(BlockService.name);
-    private mempool: Map<string, Block>;
-    private blockHeight: number;
-
-    private readonly BLOCKS_KEY = 'blockchain:blocks';
-    private readonly HEIGHT_KEY = 'blockchain:height';
-    private readonly TX_INDEX_KEY = 'blockchain:tx-index';
-    private readonly SNAPSHOT_KEY = 'blockchain:snapshots';
+    private mempool: Map<string, Block>; // In-memory storage for pending transactions
+    private blockHeight: number; // Tracks the current height of the blockchain
+    private readonly BLOCKS_KEY = 'blockchain:blocks'; // Redis key for storing blocks
+    private readonly HEIGHT_KEY = 'blockchain:height'; // Redis key for storing blockchain height
+    private readonly TX_INDEX_KEY = 'blockchain:tx-index'; // Redis key for indexing transactions
+    private readonly SNAPSHOT_KEY = 'blockchain:snapshots'; // Redis key for storing periodic snapshot
 
     constructor(
-        private readonly redis: RedisService
+        private readonly redis: RedisService // Dependency injection for Redis service
     ) {
-        this.mempool = new Map();
-        this.blockHeight = 0;
-        this.initializeStorage();
+        this.mempool = new Map(); // Initialize mempool
+        this.blockHeight = 0; // Start with a height of 0
+        this.initializeStorage(); // Initialize storage on service startup
     }
 
+    /**
+     * Initializes blockchain storage by retrieving the current height from Redis.
+     */
     private async initializeStorage() {
         try {
-            // Recuperar altura actual de la blockchain
-            const height = await this.redis.get(this.HEIGHT_KEY);
-            this.blockHeight = height ? parseInt(height) : 0;
+            const height = await this.redis.get(this.HEIGHT_KEY); // Get current blockchain height
+            this.blockHeight = height ? parseInt(height) : 0; // Set height or default to 0
         } catch (error) {
             this.logger.error('Error initializing blockchain storage:', error);
             throw error;
         }
     }
 
+    /**
+     * Creates and saves the genesis block if the blockchain is empty.
+     */
     async createAndSaveGenesisBlock(): Promise<Block> {
         const genesisBlock = new Block(
             0,
             new Date().toISOString(),
-            [], // Transacciones vacías
-            [], // Procesos críticos vacíos
-            '0',
+            [], // No transactions in genesis block
+            [], // No critical processes in genesis block
+            '0', // Previous hash is '0' for genesis block
             ''
         );
-        genesisBlock.hash = genesisBlock.calculateHash();
-        genesisBlock.validator = 'system';
-
-        // Guardar bloque génesis
-        await this.saveBlock(genesisBlock);
+        genesisBlock.hash = genesisBlock.calculateHash(); // Calculate hash for the block
+        genesisBlock.validator = 'system'; // Genesis block is validated by the system
+        await this.saveBlock(genesisBlock); // Save the genesis block
         return genesisBlock;
     }
 
+    /**
+     * Saves a block to Redis after validating it and updating necessary indices.
+     */
     async saveBlock(block: Block): Promise<void> {
         try {
-            // 1. Validar el bloque
             if (!await this.isValidBlock(block)) {
                 throw new Error('Invalid block');
             }
 
-            // 2. Serializar y guardar el bloque
+            // Serialize and store the block in Redis
             await this.redis.hSet(
                 this.BLOCKS_KEY,
                 block.hash,
                 JSON.stringify(block)
             );
 
-            // 3. Actualizar índices
+            // Update height-related indices
             await this.redis.set(`${this.HEIGHT_KEY}:${block.index}`, block.hash);
             await this.redis.set(this.HEIGHT_KEY, block.index.toString());
 
-            // 4. Indexar transacciones (si existen)
+            // Index transactions if they exist
             if (block.transactions) {
                 for (const tx of block.transactions) {
                     await this.redis.hSet(
@@ -77,13 +84,13 @@ export class BlockService {
                     );
                 }
 
-                // 5. Remover transacciones del mempool
+                // Remove transactions of mempool
                 block.transactions.forEach(tx => {
                     this.mempool.delete(tx.processId);
                 });
             }
 
-            // 6. Indexar procesos críticos (si existen)
+            // Index critical processes if they exist
             if (block.criticalProcesses) {
                 for (const process of block.criticalProcesses) {
                     await this.redis.hSet(
@@ -94,10 +101,10 @@ export class BlockService {
                 }
             }
 
-            // 7. Actualizar altura de la blockchain
+            // Update blockchain height
             this.blockHeight = Math.max(this.blockHeight, block.index);
 
-            // 8. Crear snapshot periódico (cada 1000 bloques)
+            // Create a snapshot every 1000 blocks
             if (block.index % 1000 === 0) {
                 await this.createSnapshot(block.index);
             }
@@ -109,11 +116,14 @@ export class BlockService {
         }
     }
 
+    /**
+     * Creates a snapshot of the blockchain state at a given height.
+     */
     private async createSnapshot(height: number) {
         const snapshot = {
             height,
             timestamp: new Date().toISOString(),
-            chainState: await this.getChainState()
+            chainState: await this.getChainState() // Capture current chain state
         };
 
         await this.redis.hSet(
@@ -123,9 +133,12 @@ export class BlockService {
         );
     }
 
+    /**
+     * Initializes the blockchain by either creating a genesis block or loading recent blocks into memory.
+     */
     async initializeChain(): Promise<Block[]> {
         try {
-            // 1. Verificar si existe cadena
+            // Check if blockchain exists
             const blockCount = await this.getBlockHeight();
 
             if (blockCount === 0) {
@@ -133,7 +146,7 @@ export class BlockService {
                 return [genesisBlock];
             }
 
-            // 2. Recuperar últimos 100 bloques para memoria caché
+            // Load last 100 blocks into memory for caching
             const blocks: Block[] = [];
             const startHeight = Math.max(0, this.blockHeight - 100);
 
@@ -155,25 +168,26 @@ export class BlockService {
         }
     }
 
+    /**
+     * Retrieves a block by its hash from Redis or mempool.
+     */
     async getBlock(hash: string): Promise<Block | undefined> {
         try {
-            // 1. Buscar en caché de memoria
-            const cachedBlock = this.mempool.get(hash);
+            const cachedBlock = this.mempool.get(hash); // Check mempool first
             if (cachedBlock) {
                 return cachedBlock;
             }
 
-            // 2. Obtener bloque de Redis
-            const blockData = await this.redis.hGet(this.BLOCKS_KEY, hash);
+            const blockData = await this.redis.hGet(this.BLOCKS_KEY, hash); // Fetch from Redis
             if (!blockData) return undefined;
 
-            // 3. Deserializar y reconstruir instancia de Block
+            // Deserialize and reconstruct Block instance
             const block = JSON.parse(blockData);
             const blockInstance = new Block(
                 block.index,
                 block.timestamp,
-                block.transactions || [], // Usar un array vacío si transactions es undefined
-                block.criticalProcesses || [], // Usar un array vacío si criticalProcesses es undefined
+                block.transactions || [],
+                block.criticalProcesses || [],
                 block.previousHash,
                 block.signature
             );
@@ -188,6 +202,9 @@ export class BlockService {
         }
     }
 
+    /**
+     * Retrieves a block by its height.
+     */
     async getBlockByHeight(height: number): Promise<Block | undefined> {
         try {
             const blockHash = await this.redis.get(`${this.HEIGHT_KEY}:${height}`);
@@ -198,41 +215,57 @@ export class BlockService {
         }
     }
 
+    /**
+     * Returns the current height of the blockchain.
+     */
     async getBlockHeight(): Promise<number> {
         const height = await this.redis.get(this.HEIGHT_KEY);
         return height ? parseInt(height) : 0;
     }
 
+    /**
+     * Returns the current state of the blockchain.
+     */
     private async getChainState(): Promise<any> {
         // Implementar lógica para obtener el estado actual de la cadena
         // (balances, contratos activos, etc.)
         return {};
     }
 
+    /**
+     * Validates a block by checking its hash, previous hash, and validator signature.
+     */
     private async isValidBlock(block: Block): Promise<boolean> {
         // 1. Verificar hash del bloque
         const calculatedHash = block.calculateHash();
-        if (block.hash !== calculatedHash) return false;
+        if (block.hash !== calculatedHash) return false; // Hash mismatch
 
         const previousBlock = await this.getBlockByHeight(block.index - 1);
-        if (previousBlock && block.previousHash !== previousBlock.hash) return false;
+        if (previousBlock && block.previousHash !== previousBlock.hash) return false; // Invalid previous hash
 
-        // 3. Verificar firma del validador
-        // Implementar verificación de firma aquí
-
+        // TODO: Implement validator signature verification
         return true;
     }
 
+    /**
+     * Adds a transaction to the mempool for inclusion in the next block.
+     */
     async addToMempool(transaction: any): Promise<void> {
         // Añadir transacción al mempool para inclusión en próximo bloque
         this.mempool.set(transaction.processId, transaction);
     }
 
+    /**
+     * Retrieves all transactions currently in the mempool.
+     */
     async getMempoolTransactions(): Promise<any[]> {
         // Devuelve todas las transacciones en el mempool
         return Array.from(this.mempool.values());
     }
 
+    /**
+     * Retrieves the block containing a specific transaction by its ID.
+     */
     async getTransactionBlock(txId: string): Promise<Block | undefined> {
         try {
             const blockHash = await this.redis.hGet(this.TX_INDEX_KEY, txId);
@@ -243,6 +276,10 @@ export class BlockService {
         }
     }
 
+    
+    /**
+     * Creates a new block with the specified transactions and returns it.
+     */
     async createBlock(transactions: any[]): Promise<Block> {
         const height = await this.getBlockHeight();
         const previousBlock = await this.getBlockByHeight(height);

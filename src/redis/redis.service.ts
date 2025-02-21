@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createClient, RedisClientType } from 'redis';
 
+/**
+ * RedisService handles the connection and operations related to Redis.
+ * It includes methods for validator peer management and generic Redis commands.
+ */
 @Injectable()
 export class RedisService {
   private logger = new Logger(RedisService.name);
@@ -11,6 +15,9 @@ export class RedisService {
     this.setupRedisEventHandlers();
   }
 
+  /**
+   * Sets up event handlers for Redis client connection and error events.
+   */
   private setupRedisEventHandlers() {
     this.redisClient.on('error', (err) => {
       this.logger.error(`Redis Error: ${err.message}`);
@@ -21,6 +28,9 @@ export class RedisService {
     });
   }
 
+  /**
+   * Establishes a connection to Redis.
+   */
   async connectToRedis() {
     try {
       await this.redisClient.connect();
@@ -29,6 +39,9 @@ export class RedisService {
     }
   }
 
+  /**
+   * Disconnects from Redis.
+   */
   async disconnect() {
     try {
       await this.redisClient.quit();
@@ -38,6 +51,10 @@ export class RedisService {
     }
   }
 
+  /**
+   * Stores validator peers in Redis.
+   * @param peers Object containing peer data.
+   */
   async storeValidatorPeers(peers: Record<string, string>) {
     try {
       await this.redisClient.hSet('validatorPeers', peers);
@@ -46,6 +63,10 @@ export class RedisService {
     }
   }
 
+  /**
+   * Removes a validator peer from Redis.
+   * @param ip IP address of the validator peer.
+   */
   async removeValidatorPeer(ip: string) {
     try {
       await this.redisClient.hDel('validatorPeers', ip);
@@ -54,6 +75,10 @@ export class RedisService {
     }
   }
 
+  /**
+   * Retrieves all fields and values for a given key from Redis.
+   * @param key The key to query.
+   */
   async hGetAll(key: string): Promise<Record<string, string>> {
     try {
       return await this.redisClient.hGetAll(key);
@@ -63,6 +88,12 @@ export class RedisService {
     }
   }
 
+  /**
+   * Sets a field in a hash stored at key.
+   * @param key Redis key.
+   * @param field Field name.
+   * @param value Field value.
+   */
   async hSet(key: string, field: string, value: string): Promise<void> {
     try {
       await this.redisClient.hSet(key, field, value);
@@ -71,6 +102,11 @@ export class RedisService {
     }
   }
 
+  /**
+   * Checks if a field exists in a hash.
+   * @param key Redis key.
+   * @param field Field name.
+   */
   async hExists(key: string, field: string): Promise<boolean> {
     try {
       return await this.redisClient.hExists(key, field);
@@ -80,6 +116,11 @@ export class RedisService {
     }
   }
 
+  /**
+   * Retrieves the value of a field in a hash.
+   * @param key Redis key.
+   * @param field Field name.
+   */
   async hGet(key: string, field: string): Promise<string | null> {
     try {
       return await this.redisClient.hGet(key, field);
@@ -89,6 +130,10 @@ export class RedisService {
     }
   }
 
+  /**
+   * Retrieves the value of a key.
+   * @param key Redis key.
+   */
   async get(key: string): Promise<string | null> {
     try {
       return await this.redisClient.get(key);
@@ -98,6 +143,11 @@ export class RedisService {
     }
   }
 
+  /**
+   * Sets a value for a given key in Redis.
+   * @param key Redis key.
+   * @param value Value to set.
+   */
   async set(key: string, value: string): Promise<void> {
     try {
       await this.redisClient.set(key, value);
@@ -106,6 +156,10 @@ export class RedisService {
     }
   }
 
+  /**
+   * Deletes a key from Redis.
+   * @param key Redis key to delete.
+   */
   async del(key: string): Promise<void> {
     try {
       await this.redisClient.del(key);
@@ -114,6 +168,9 @@ export class RedisService {
     }
   }
 
+  /**
+   * Pings the Redis server to check connectivity.
+   */
   async ping(): Promise<string> {
     try {
       return await this.redisClient.ping();
@@ -122,5 +179,4 @@ export class RedisService {
       return 'Error';
     }
   }
-
 }

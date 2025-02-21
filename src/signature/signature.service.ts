@@ -3,6 +3,10 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * SignatureService handles cryptographic operations such as key management,
+ * signing messages, and verifying signatures.
+ */
 @Injectable()
 export class SignatureService {
   private privateKey: string; // Private key used for signing messages
@@ -53,8 +57,8 @@ export class SignatureService {
    * @returns The signature as a hexadecimal string.
    */
   signMessage(message: string): string {
-    const sign = crypto.createSign('SHA256');
-    sign.update(message);
+    const sign = crypto.createSign('SHA256'); // Create SHA-256 signer
+    sign.update(message); // Add message to sign
     sign.end();
     return sign.sign(this.privateKey, 'hex');
   }
@@ -67,8 +71,8 @@ export class SignatureService {
    * @returns True if the signature is valid, false otherwise.
    */
   verifySignature(message: string, signature: string, publicKey: string): boolean {
-    const verify = crypto.createVerify('SHA256');
-    verify.update(message);
+    const verify = crypto.createVerify('SHA256'); // Create SHA-256 verifier
+    verify.update(message); // Add message to verify
     verify.end();
     return verify.verify(publicKey, signature, 'hex');
   }

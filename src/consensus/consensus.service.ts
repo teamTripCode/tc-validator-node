@@ -3,11 +3,18 @@ import { Block } from 'src/block/block';
 import { BlockService } from 'src/block/block.service';
 import { SignatureService } from 'src/signature/signature.service';
 
+/**
+ * ConsensusService manages the consensus mechanism for the blockchain, ensuring agreement among validators.
+ * It handles PREPARE, COMMIT, and VIEW_CHANGE messages, verifies signatures, and finalizes blocks when consensus is reached.
+ */
 @Injectable()
 export class ConsensusService {
   private readonly logger = new Logger(ConsensusService.name);
 
-  // Maps to store PREPARE and COMMIT messages for each block (keyed by blockHeight:blockHash)
+  /**
+   * Maps to store PREPARE and COMMIT messages for each block
+   * Key format: blockHeight:blockHash
+   */
   private prepareMessages: Map<string, ConsensusMessage[]> = new Map();
   private commitMessages: Map<string, ConsensusMessage[]> = new Map();
 
@@ -17,19 +24,18 @@ export class ConsensusService {
   ) { }
 
   /**
-   * Handles incoming consensus messages, verifies their signatures, 
-   * and processes them based on their type.
+   * Handles incoming consensus messages, verifies their signatures,
+   * and processes them based on their type (PREPARE, COMMIT, VIEW_CHANGE).
    * @param message - The consensus message to process.
    */
   async handleConsensusMessage(message: ConsensusMessage): Promise<void> {
     try {
-      // Verify the message signature before processing
       if (!this.verifyMessageSignature(message)) {
         this.logger.warn(`Invalid signature in consensus message from ${message.validator}`);
         return;
       }
 
-      // Process the message based on its type
+      // Route message to the corresponding handler based on its type
       switch (message.type) {
         case ConsensusMessageType.PREPARE:
           await this.handlePrepareMessage(message);
@@ -47,8 +53,7 @@ export class ConsensusService {
   }
 
   /**
-   * Handles a PREPARE message by storing it and checking if enough PREPARE messages
-   * have been received to proceed with broadcasting a COMMIT.
+   * Handles a PREPARE message: stores it and broadcasts COMMIT if quorum is reached.
    * @param message - The PREPARE consensus message.
    */
   private async handlePrepareMessage(message: ConsensusMessage) {
@@ -58,15 +63,13 @@ export class ConsensusService {
     }
     this.prepareMessages.get(key).push(message);
 
-    // Check if we have enough PREPARE messages to broadcast a COMMIT
     if (this.prepareMessages.get(key).length >= this.getRequiredPrepares()) {
       await this.broadcastCommit(message.blockHeight, message.blockHash);
     }
   }
 
   /**
-   * Handles a COMMIT message by storing it and checking if enough COMMIT messages
-   * have been received to finalize the block.
+   * Handles a COMMIT message: stores it and finalizes the block if quorum is reached.
    * @param message - The COMMIT consensus message.
    */
   private async handleCommitMessage(message: ConsensusMessage) {
@@ -76,14 +79,13 @@ export class ConsensusService {
     }
     this.commitMessages.get(key).push(message);
 
-    // Check if we have enough COMMIT messages to finalize the block
     if (this.commitMessages.get(key).length >= this.getRequiredCommits()) {
       await this.finalizeBlock(message.blockHeight, message.blockHash);
     }
   }
 
   /**
-   * Placeholder for handling VIEW_CHANGE messages in PBFT consensus.
+   * Placeholder for VIEW_CHANGE message handling in PBFT consensus.
    * @param message - The VIEW_CHANGE consensus message.
    */
   private async handleViewChangeMessage(message: ConsensusMessage) {
@@ -91,53 +93,53 @@ export class ConsensusService {
   }
 
   /**
-   * Calculates the number of required PREPARE messages (2f + 1).
-   * @returns The minimum number of PREPARE messages needed for consensus.
+   * Calculates the minimum number of PREPARE messages required (2f + 1).
+   * @returns Required PREPARE messages for consensus.
    */
   private getRequiredPrepares(): number {
     return Math.floor(this.getTotalValidators() * 2 / 3) + 1;
   }
 
   /**
-   * Calculates the number of required COMMIT messages (same as PREPARE).
-   * @returns The minimum number of COMMIT messages needed for consensus.
+   * Calculates the minimum number of COMMIT messages required (same as PREPARE).
+   * @returns Required COMMIT messages for consensus.
    */
   private getRequiredCommits(): number {
     return this.getRequiredPrepares();
   }
 
   /**
-   * Placeholder for retrieving the total number of active validators.
-   * @returns The total number of validators in the network.
+   * Retrieves the total number of active validators in the network.
+   * @returns Total validator count.
    */
   private getTotalValidators(): number {
-    // Implement logic to fetch the total number of active validators
+    // Implement logic to fetch total validators
     return 0;
   }
 
   /**
    * Verifies the signature of a consensus message.
    * @param message - The consensus message to verify.
-   * @returns True if the signature is valid, false otherwise.
+   * @returns True if valid, false otherwise.
    */
   private verifyMessageSignature(message: ConsensusMessage): boolean {
-    // Implement signature verification logic using the SignatureService
+    // Implement signature verification using SignatureService
     return true;
   }
 
   /**
    * Broadcasts a COMMIT message to all validators.
-   * @param height - The block height.
-   * @param hash - The block hash.
+   * @param height - Block height.
+   * @param hash - Block hash.
    */
   private async broadcastCommit(height: number, hash: string) {
-    // Implement logic to broadcast a COMMIT message
+    // Implement broadcasting logic
   }
 
   /**
-   * Finalizes a block when enough COMMIT messages have been received.
-   * @param height - The block height.
-   * @param hash - The block hash.
+   * Finalizes a block when enough COMMIT messages are received.
+   * @param height - Block height.
+   * @param hash - Block hash.
    */
   private async finalizeBlock(height: number, hash: string) {
     const block = await this.block.getBlock(hash);
@@ -147,6 +149,10 @@ export class ConsensusService {
     }
   }
 
+  /**
+   * Proposes a new block by broadcasting a PREPARE message.
+   * @param block - The block to propose.
+   */
   async proposeBlock(block: Block) {
     const message: ConsensusMessage = {
       type: ConsensusMessageType.PREPARE,
@@ -158,8 +164,12 @@ export class ConsensusService {
     this.broadcastPrepare(message);
   }
 
+  /**
+   * Broadcasts a PREPARE message to all validators.
+   * @param message - The PREPARE consensus message.
+   */
   private async broadcastPrepare(message: ConsensusMessage) {
-    // Implementa la lógica para enviar el mensaje PREPARE a otros validadores
+    // Implement the logic to broadcast PREPARE messages
     console.log(`Broadcasting PREPARE message for block ${message.blockHash}`);
   }
 }

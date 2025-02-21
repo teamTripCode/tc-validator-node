@@ -9,6 +9,11 @@ import { BlockService } from "src/block/block.service";
 import { Block } from "src/block/block";
 import { ConsensusService } from "src/consensus/consensus.service";
 
+/**
+ * Service responsible for validator node functionality in the blockchain network.
+ * Handles validator initialization, authentication, consensus participation,
+ * and state synchronization with other network nodes.
+ */
 @Injectable()
 export class ValidatorService {
     private logger = new Logger(ValidatorService.name);
@@ -27,6 +32,8 @@ export class ValidatorService {
      * Constructor initializes the service with dependencies.
      * @param redis - Redis service for storing and retrieving validator data.
      * @param signature - Signature service for cryptographic operations.
+     * @param block - Block service for blockchain operations.
+     * @param consensus - Consensus service for participating in the network consensus.
      */
     constructor(
         private readonly redis: RedisService,
@@ -39,6 +46,8 @@ export class ValidatorService {
 
     /**
      * Initializes the validator by setting up its metadata and syncing with seed nodes.
+     * Creates the validator's identity using cryptographic keys and prepares it for
+     * network participation.
      */
     private async initializeValidator() {
         this.myValidatorInfo = {
@@ -54,6 +63,8 @@ export class ValidatorService {
 
     /**
      * Authenticates the validator with a seed node to obtain a token and client ID.
+     * Tries multiple seed nodes in case of failure and establishes WebSocket connection
+     * upon successful authentication.
      */
     private async authenticateWithSeedNode() {
         const seedNodes = process.env.SEED_NODES?.split(',') || [];
@@ -83,7 +94,7 @@ export class ValidatorService {
 
                     // Step 4: Sync validators
                     await this.syncValidatorsFromSeed();
-                    break;
+                    break; // Exit loop after successful authentication
                 }
             } catch (error) {
                 this.logger.error(`Error authenticating with seed node ${seedNode}: ${error.message}`);
@@ -92,12 +103,18 @@ export class ValidatorService {
         if (!this.authenticated) {
             this.logger.error('Failed to authenticate with any seed node');
             // Retry after 30 seconds
+            /** 
+             * Implementing exponential backoff strategy would be better here
+             * but using fixed interval for simplicity
+             */
             setTimeout(() => this.authenticateWithSeedNode(), 30000);
         }
     }
 
     /**
      * Establishes a WebSocket connection with the seed node for real-time communication.
+     * Sets up event handlers for various network events like peer discovery and failover.
+     * 
      * @param seedNode - The URL of the seed node.
      */
     private async establishWebSocketConnection(seedNode: string) {
@@ -133,6 +150,10 @@ export class ValidatorService {
             });
 
             // Start heartbeat interval
+            /** 
+             * Regular heartbeats help detect connection issues early
+             * and maintain presence in the network
+             */
             setInterval(() => {
                 if (this.socket.connected) {
                     this.socket.emit('heartbeat');
@@ -145,6 +166,8 @@ export class ValidatorService {
 
     /**
      * Handles peer discovery events to update the list of connected peers.
+     * Updates local state with information about new and disconnected peers.
+     * 
      * @param data - Peer discovery data containing new or disconnected peers.
      */
     private handlePeerDiscovery(data: any) {
@@ -152,6 +175,10 @@ export class ValidatorService {
             if (data.peers) {
                 this.logger.log('Updating network peer list');
                 // Update local peer list
+                /** 
+                 * Here we would store the full peer list in a local data structure
+                 * for use in consensus and other network operations
+                 */
             }
             if (data.newPeer) {
                 this.logger.log(`New peer connected: ${data.newPeer.ip}`);
@@ -168,6 +195,8 @@ export class ValidatorService {
 
     /**
      * Handles state synchronization events to update the validator's state.
+     * Ensures this validator has the latest network information.
+     * 
      * @param data - State synchronization data containing updated peer information.
      */
     private handleStateSync(data: any) {
@@ -175,6 +204,10 @@ export class ValidatorService {
             if (data.peers) {
                 this.logger.log('Synchronizing state with new peers');
                 // Update local state with new information
+                /** 
+                 * This would typically involve updating the local blockchain state,
+                 * pending transactions, and validator information
+                 */
             }
         } catch (error) {
             this.logger.error(`Error during state synchronization: ${error.message}`);
@@ -183,24 +216,39 @@ export class ValidatorService {
 
     /**
      * Handles failover events initiated by the seed node.
+     * Implements recovery procedures when primary nodes fail.
      */
     private handleFailover() {
         this.logger.warn('Failover initiated by seed node');
         // Implement failover logic here
+        /** 
+         * Failover logic might include:
+         * 1. Stopping normal operations
+         * 2. Re-evaluating the leader
+         * 3. Re-synchronizing state
+         * 4. Resuming operations under new leadership
+         */
     }
 
     /**
      * Fetches the list of validators from a seed node.
+     * Used during synchronization to get the latest validator set.
+     * 
      * @param seedNode - The URL of the seed node.
      * @returns A list of validators.
      */
     private async getValidatorsFromSeed(seedNode: string): Promise<ValidatorInfo[]> {
         // Implement logic to fetch validators from the seed node via HTTP/WebSocket
+        /** 
+         * This would typically involve making an API call to the seed node
+         * to retrieve the current set of active validators
+         */
         return [];
     }
 
     /**
      * Synchronizes the validator set with the seed nodes.
+     * Ensures this node has up-to-date information about all validators.
      */
     async syncValidatorsFromSeed() {
         try {
@@ -223,6 +271,8 @@ export class ValidatorService {
 
     /**
      * Updates the validator set periodically (every 30 seconds).
+     * Maintains the current state of all validators in the network.
+     * 
      * @param newValidators - Optional list of new validators to update the set.
      */
     @Interval(30000)
@@ -240,6 +290,10 @@ export class ValidatorService {
             );
 
             // Check if this validator is part of the active set
+            /** 
+             * Active validators participate in block production and validation,
+             * while standby validators are ready to join if needed
+             */
             const amIValidator = this.consensusState.validatorsSet.has(this.myValidatorInfo.address);
             if (amIValidator) {
                 this.myValidatorInfo.status = ValidatorStatus.ACTIVE;
@@ -260,6 +314,7 @@ export class ValidatorService {
 
     /**
      * Participates in the consensus process periodically (every 5 seconds).
+     * Active validators propose or validate blocks based on their role.
      */
     @Interval(5000)
     async participateInConsensus() {
@@ -269,6 +324,10 @@ export class ValidatorService {
             this.myValidatorInfo.lastActive = Date.now();
 
             // Participate in the current consensus round
+            /** 
+             * The consensus mechanism follows a leader-follower pattern
+             * where one validator proposes and others validate
+             */
             const isLeader = this.checkIfLeader();
             if (isLeader) {
                 await this.proposeNewBlock();
@@ -282,33 +341,48 @@ export class ValidatorService {
 
     /**
      * Checks if this validator is the leader for the current consensus round.
+     * Uses a Delegated Proof of Stake (DPoS) algorithm to determine leadership.
+     * 
      * @returns True if this validator is the leader, false otherwise.
      */
     private checkIfLeader(): boolean {
         // Implement DPoS logic to determine if this validator is the leader
+        /** 
+         * Leadership determination might involve:
+         * 1. Calculating a deterministic schedule based on validator stakes
+         * 2. Checking if it's this validator's turn in the schedule
+         * 3. Verifying leadership eligibility based on reputation
+         */
         return false;
     }
 
     /**
      * Proposes a new block when this validator is the leader.
+     * Collects transactions, creates a block, and submits it for consensus.
      */
     private async proposeNewBlock() {
         try {
-            // Obtener las transacciones del mempool
+            // Get transactions from the mempool
             const transactions = await this.block.getMempoolTransactions();
 
-            // Obtener la altura actual del bloque y calcular la nueva altura
+            // Get current block height and calculate new height
             const currentHeight = await this.block.getBlockHeight();
             const newHeight = currentHeight + 1;
 
-            // Crear un nuevo bloque
+            // Create a new block
+            /** 
+             * The block creation process includes:
+             * 1. Selecting transactions from the mempool
+             * 2. Creating a block with appropriate metadata
+             * 3. Signing the block with the validator's private key (done in consensus service)
+             */
             const newBlock = new Block(
                 newHeight,
                 new Date().toISOString(),
                 transactions
             );
 
-            // Proponer el nuevo bloque al consenso
+            // Propose the new block to the consensus
             await this.consensus.proposeBlock(newBlock);
             this.logger.log(`Proposed new block with hash: ${newBlock.hash}`);
         } catch (error) {
@@ -318,8 +392,16 @@ export class ValidatorService {
 
     /**
      * Validates a proposed block using PBFT consensus logic.
+     * Non-leader validators verify and vote on proposed blocks.
      */
     private async validateProposedBlock() {
         // Implement PBFT logic to validate the proposed block
+        /** 
+         * Practical Byzantine Fault Tolerance (PBFT) validation typically involves:
+         * 1. Verifying the block's integrity and transactions
+         * 2. Checking the proposer's signature and authority
+         * 3. Voting on block acceptance (prepare/commit phases)
+         * 4. Participating in view changes if leader fails
+         */
     }
 }
