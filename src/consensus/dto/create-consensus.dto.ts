@@ -16,5 +16,6 @@ interface ConsensusMessage {
 enum ConsensusMessageType {
     PREPARE = 'PREPARE', // Indicates a PREPARE message used to propose a block
     COMMIT = 'COMMIT', // Indicates a COMMIT message used to finalize a block
-    VIEW_CHANGE = 'VIEW_CHANGE' // Indicates a VIEW_CHANGE message used to handle changes in the primary validator
+    VIEW_CHANGE = 'VIEW_CHANGE', // Indicates a VIEW_CHANGE message used to handle changes in the primary validator
+    PRE_PREPARE = 'PRE_PREPARE', // Indicates a PRE-PREPARE message used to propose a block in the first phase of PBFT
 }

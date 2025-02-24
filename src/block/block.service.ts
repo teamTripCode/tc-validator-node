@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { RedisService } from 'src/redis/redis.service';
 import * as crypto from 'crypto';
+import { BlockType } from './dto/block.dto';
 
 @Injectable()
 export class BlockService {
@@ -43,6 +44,37 @@ export class BlockService {
             return response.data.transactions;
         } catch (error) {
             this.logger.error(`Error getting mempool transactions: ${error.message}`);
+            throw error;
+        }
+    }
+
+    async getBlockFromMempool(): Promise<any> {
+        try {
+            const transactions = await this.getMempoolTransactions();
+            if (!transactions || transactions.length === 0) {
+                return null;
+            }
+
+            // Construir un bloque temporal con las transacciones del mempool
+            const previousBlock = await this.getBlockByHeight(await this.getBlockHeight());
+            const newBlock = {
+                index: previousBlock.index + 1,
+                timestamp: new Date().toISOString(),
+                type: BlockType.TRANSACTION,
+                transactions: transactions,
+                previousHash: previousBlock.hash,
+                hash: '', // Este valor será calculado después
+                nonce: 0,
+                signature: '', // Este valor será firmado después
+                validator: '', // Este valor será asignado después
+            };
+
+            // Calcular el hash del bloque
+            newBlock.hash = this.calculateHash(newBlock);
+
+            return newBlock;
+        } catch (error) {
+            this.logger.error(`Error getting block from mempool: ${error.message}`);
             throw error;
         }
     }
@@ -94,7 +126,7 @@ export class BlockService {
         }
     }
 
-    private async isValidBlock(block: any): Promise<boolean> {
+    public async isValidBlock(block: any): Promise<boolean> {
         try {
             // Verificar que el hash del bloque sea correcto
             const calculatedHash = this.calculateHash(block);

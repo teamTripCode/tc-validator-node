@@ -318,6 +318,7 @@ export class ValidatorService {
     @Interval(5000)
     async participateInConsensus() {
         if (this.myValidatorInfo.status !== ValidatorStatus.ACTIVE) return;
+
         try {
             // Update validator activity timestamp
             this.myValidatorInfo.lastActive = Date.now();
@@ -365,7 +366,7 @@ export class ValidatorService {
             const transactions = await this.block.getMempoolTransactions();
 
             const newBlock = await this.block.proposeNewBlock(transactions);
-            
+
             // Propose the new block to the consensus
             await this.consensus.proposeBlock(newBlock);
             this.logger.log(`Proposed new block with hash: ${newBlock.hash}`);
@@ -379,13 +380,26 @@ export class ValidatorService {
      * Non-leader validators verify and vote on proposed blocks.
      */
     private async validateProposedBlock() {
-        // Implement PBFT logic to validate the proposed block
-        /** 
-         * Practical Byzantine Fault Tolerance (PBFT) validation typically involves:
-         * 1. Verifying the block's integrity and transactions
-         * 2. Checking the proposer's signature and authority
-         * 3. Voting on block acceptance (prepare/commit phases)
-         * 4. Participating in view changes if leader fails
-         */
+        // Get the proposed block from the mempool
+        const proposedBlock = await this.block.getBlockFromMempool();
+        if (!proposedBlock) {
+            this.logger.warn("No proposed block to validate");
+            return;
+        }
+
+        // Validate the proposed block
+        if (!this.block.isValidBlock(proposedBlock)) {
+            this.logger.warn("Invalid proposed block");
+            return;
+        }
+
+        // Handle the PREPARE message for the proposed block
+        await this.consensus.handleConsensusMessage({
+            type: ConsensusMessageType.PREPARE,
+            blockHeight: proposedBlock.index,
+            blockHash: proposedBlock.hash,
+            validator: this.myValidatorInfo.address,
+            signature: this.signature.signMessage(proposedBlock.hash),
+        });
     }
 }

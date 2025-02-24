@@ -179,4 +179,19 @@ export class RedisService {
       return 'Error';
     }
   }
+
+  /**
+   * Ejecuta un comando raw de Redis.
+   * @param command Comando Redis
+   * @param args Argumentos del comando
+   * @returns Resultado del comando
+   */
+  async redisCommand(command: string, ...args: string[]): Promise<any> {
+    try {
+      return await this.redisClient.sendCommand([command, ...args]);
+    } catch (error) {
+      this.logger.error(`Error executing Redis command ${command}: ${error.message}`);
+      throw error;
+    }
+  }
 }

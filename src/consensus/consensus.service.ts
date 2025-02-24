@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BlockService } from 'src/block/block.service';
 import { IBlock } from 'src/block/dto/block.dto';
+import { QueueService } from 'src/queue/queue.service';
 import { SignatureService } from 'src/signature/signature.service';
 import { TripcoinService } from 'src/tripcoin/tripcoin.service';
+import { ValidatorGateway } from 'src/validator/validator.gateway';
 
 /**
  * ConsensusService manages the consensus mechanism for the blockchain, ensuring agreement among validators.
@@ -16,13 +18,16 @@ export class ConsensusService {
    * Maps to store PREPARE and COMMIT messages for each block
    * Key format: blockHeight:blockHash
    */
+  private prePrepareMessages: Map<string, ConsensusMessage[]> = new Map();
   private prepareMessages: Map<string, ConsensusMessage[]> = new Map();
   private commitMessages: Map<string, ConsensusMessage[]> = new Map();
+  private readonly gatewayP2p: ValidatorGateway
 
   constructor(
     private readonly signature: SignatureService,
     private readonly block: BlockService,
     private readonly tripcoin: TripcoinService,
+    private readonly queue: QueueService
   ) { }
 
   /**
@@ -39,6 +44,9 @@ export class ConsensusService {
 
       // Route message to the corresponding handler based on its type
       switch (message.type) {
+        case ConsensusMessageType.PRE_PREPARE:
+          await this.handlePrePrepareMessage(message);
+          break;
         case ConsensusMessageType.PREPARE:
           await this.handlePrepareMessage(message);
           break;
@@ -52,6 +60,27 @@ export class ConsensusService {
     } catch (error) {
       this.logger.error(`Error processing consensus message: ${error.message}`);
     }
+  }
+
+  /**
+   * Fase 1: Pre-Prepare
+   */
+  private async handlePrePrepareMessage(message: ConsensusMessage) {
+    const key = `${message.blockHeight}:${message.blockHash}`;
+    if (!this.prePrepareMessages.has(key)) {
+      this.prePrepareMessages.set(key, []);
+    }
+    this.prePrepareMessages.get(key).push(message);
+
+    // Verificar validez del bloque usando BlockService
+    const block = await this.block.getBlock(message.blockHash);
+    if (!block || !(await this.block.isValidBlock(block))) { // Usamos BlockService.isValidBlock
+      this.logger.warn(`Invalid block in Pre-Prepare phase: ${message.blockHash}`);
+      return;
+    }
+
+    // Difundir mensaje Prepare
+    await this.broadcastPrepare(message);
   }
 
   /**
@@ -92,6 +121,15 @@ export class ConsensusService {
    */
   private async handleViewChangeMessage(message: ConsensusMessage) {
     // Implement PBFT view change logic here
+    this.logger.log(`View Change initiated by ${message.validator}`);
+  }
+
+  /**
+   * Calcula el quórum requerido (2f + 1).
+   */
+  private getRequiredQuorum(): number {
+    const totalValidators = this.getTotalValidators();
+    return Math.floor((totalValidators * 2) / 3) + 1;
   }
 
   /**
@@ -125,8 +163,11 @@ export class ConsensusService {
    * @returns True if valid, false otherwise.
    */
   private verifyMessageSignature(message: ConsensusMessage): boolean {
-    // Implement signature verification using SignatureService
-    return true;
+    return this.signature.verifySignature(
+      JSON.stringify({ ...message, signature: undefined }),
+      message.signature,
+      message.validator
+    );
   }
 
   /**
@@ -134,8 +175,18 @@ export class ConsensusService {
    * @param height - Block height.
    * @param hash - Block hash.
    */
-  private async broadcastCommit(height: number, hash: string) {
-    // Implement broadcasting logic
+  private async broadcastCommit(height: number, hash: string): Promise<void> {
+    const message: ConsensusMessage = {
+      type: ConsensusMessageType.COMMIT, // Cambiar de PREPARE a COMMIT
+      blockHeight: height,
+      blockHash: hash,
+      validator: this.signature.getAddress(),
+      signature: this.signature.signMessage(hash),
+    };
+    this.logger.log(`Broadcasting COMMIT message for block ${hash}`);
+
+    // use the gateway to broadcast the message
+    this.gatewayP2p.broadcastConsensusMessage(message);
   }
 
   /**
@@ -169,10 +220,14 @@ export class ConsensusService {
 
   /**
    * Broadcasts a PREPARE message to all validators.
-   * @param message - The PREPARE consensus message.
+   * @param height - Block height.
+   * @param hash - Block hash.
    */
-  private async broadcastPrepare(message: ConsensusMessage) {
-    // Implement the logic to broadcast PREPARE messages
-    console.log(`Broadcasting PREPARE message for block ${message.blockHash}`);
+  private async broadcastPrepare(message: ConsensusMessage): Promise<void> {
+    const { blockHeight, blockHash } = message;
+    console.log(`Broadcasting PREPARE message for block ${blockHash} at height ${blockHeight}`);
+
+    // Usar el gateway para difundir el mensaje
+    this.gatewayP2p.broadcastConsensusMessage(message);
   }
 }

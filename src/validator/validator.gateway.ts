@@ -2,6 +2,9 @@ import { WebSocketGateway, WebSocketServer, SubscribeMessage, OnGatewayConnectio
 import { Logger } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { RedisService } from "../redis/redis.service";
+import { ConsensusService } from "src/consensus/consensus.service";
+import { SignatureService } from "src/signature/signature.service";
+import { QueueService } from "src/queue/queue.service";
 
 /**
  * ValidatorGateway handles WebSocket connections for validators, manages peer discovery,
@@ -21,7 +24,12 @@ export class ValidatorGateway implements OnGatewayConnection, OnGatewayDisconnec
    * Constructor initializes the gateway with the Redis service dependency.
    * @param redisService - Service for interacting with Redis to store validator peers.
    */
-  constructor(private readonly redisService: RedisService) { }
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly consensus: ConsensusService,
+    private readonly signature: SignatureService,
+    private readonly queue: QueueService
+  ) { }
 
   /**
    * Handles new WebSocket connections from validators.
@@ -95,5 +103,46 @@ export class ValidatorGateway implements OnGatewayConnection, OnGatewayDisconnec
   async handleFailover(client: Socket) {
     this.logger.warn(`Failover initiated by: ${client.id}`);
     this.server.emit("FAILOVER_INITIATED");
+  }
+
+  @SubscribeMessage('consensusMessage')
+  async handleConsensusMessage(client: Socket, message: ConsensusMessage): Promise<void> {
+    this.logger.log(`Received consensus message: ${JSON.stringify(message)}`);
+
+    // Validar la firma del mensaje antes de procesarlo
+    if (!this.verifyMessageSignature(message)) {
+      this.logger.warn(`Invalid signature in consensus message from ${message.validator}`);
+      return;
+    }
+
+    // Pasar el mensaje al servicio de consenso para procesarlo
+    await this.consensus.handleConsensusMessage(message);
+  }
+
+  // Aditional methods will be added here
+
+  /**
+   * Verifies the signature of a consensus message using SignatureService.
+   * @param message - The consensus message to verify.
+   * @returns True if the signature is valid, false otherwise.
+   */
+  private verifyMessageSignature(message: ConsensusMessage): boolean {
+    const { signature, validator } = message;
+    const messageWithoutSignature = JSON.stringify({ ...message, signature: undefined });
+
+    return this.signature.verifySignature(messageWithoutSignature, signature, validator);
+  }
+
+  /**
+   * Broadcasts a consensus message to all connected validators.
+   * @param message - The consensus message to broadcast.
+   * @returns void
+   */
+  async broadcastConsensusMessage(message: ConsensusMessage): Promise<void> {
+    // Broadcast through WebSockets to other validators
+    this.server.emit('consensus', message);
+
+    // Add to processing queue
+    await this.queue.enqueueConsensusMessage(message);
   }
 }
