@@ -1,4 +1,10 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, OnGatewayConnection, OnGatewayDisconnect } from "@nestjs/websockets";
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+  OnGatewayDisconnect
+} from "@nestjs/websockets";
 import { Logger } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { RedisService } from "../redis/redis.service";
@@ -144,5 +150,13 @@ export class ValidatorGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     // Add to processing queue
     await this.queue.enqueueConsensusMessage(message);
+  }
+
+  /**
+   * Verifica si hay validadores conectados.
+   * @returns True si hay al menos un validador conectado, false en caso contrario.
+   */
+  isConnected(): boolean {
+    return this.connectedValidators.size > 0;
   }
 }

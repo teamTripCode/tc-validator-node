@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConsensusService } from 'src/consensus/consensus.service';
+import { ConsensusMessage } from 'src/consensus/dto/create-consensus.dto';
 import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()

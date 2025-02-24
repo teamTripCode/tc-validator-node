@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from 'src/redis/redis.service';
-import { StateService } from 'src/state/state.service';
 import { ValidatorService } from 'src/validator/validator.service';
 
 @Injectable()

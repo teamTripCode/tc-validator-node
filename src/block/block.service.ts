@@ -1,4 +1,3 @@
-// src/block/block.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { RedisService } from 'src/redis/redis.service';
@@ -13,6 +12,7 @@ export class BlockService {
     private readonly BLOCKS_KEY = 'blockchain:blocks'; // Clave Redis para almacenar bloques
     private readonly HEIGHT_KEY = 'blockchain:height'; // Clave Redis para almacenar la altura de la blockchain
     private readonly TX_INDEX_KEY = 'blockchain:tx-index'; // Clave Redis para indexar transacciones
+    private readonly PENDING_BLOCKS_KEY = 'blockchain:pending-blocks'; // Clave Redis para bloques pendientes
 
     constructor(private readonly redis: RedisService) {
         this.fullNodeUrl = process.env.FULL_NODE_URL || 'http://localhost:3001';
@@ -118,6 +118,9 @@ export class BlockService {
                 }
             }
 
+            // Eliminar de bloques pendientes si estaba allí
+            await this.redis.hDel(this.PENDING_BLOCKS_KEY, block.hash);
+
             // Registrar el bloque en la altura actual
             this.logger.log(`Block saved successfully: ${block.hash}`);
         } catch (error) {
@@ -155,6 +158,51 @@ export class BlockService {
         } catch (error) {
             this.logger.error(`Error validating block: ${error.message}`);
             return false;
+        }
+    }
+
+    /**
+     * Guarda un bloque como pendiente para su posterior procesamiento
+     * @param block Bloque a guardar como pendiente
+     */
+    async savePendingBlock(block: any): Promise<void> {
+        try {
+            await this.redis.hSet(
+                this.PENDING_BLOCKS_KEY,
+                block.hash,
+                JSON.stringify(block)
+            );
+            this.logger.log(`Block ${block.hash} saved as pending`);
+        } catch (error) {
+            this.logger.error(`Error saving pending block: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Obtiene todos los bloques pendientes desde una altura específica
+     * @param fromHeight Altura desde la que obtener bloques pendientes
+     * @returns Array de bloques pendientes
+     */
+    async getPendingBlocks(fromHeight: number): Promise<any[]> {
+        try {
+            // Obtener todos los bloques pendientes
+            const pendingBlocksData = await this.redis.hGetAll(this.PENDING_BLOCKS_KEY);
+
+            if (!pendingBlocksData) {
+                return [];
+            }
+
+            // Convertir a array de bloques y filtrar por altura
+            const pendingBlocks = Object.values(pendingBlocksData)
+                .map(blockStr => JSON.parse(blockStr))
+                .filter(block => block.index > fromHeight)
+                .sort((a, b) => a.index - b.index); // Ordenar por altura ascendente
+
+            return pendingBlocks;
+        } catch (error) {
+            this.logger.error(`Error getting pending blocks: ${error.message}`);
+            throw error;
         }
     }
 

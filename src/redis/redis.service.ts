@@ -169,6 +169,21 @@ export class RedisService {
   }
 
   /**
+   * Método genérico para eliminar un campo de un hash almacenado en una clave.
+   * @param key Clave de Redis.
+   * @param field Campo a eliminar.
+   * @returns Número de campos eliminados.
+   */
+  async hDel(key: string, field: string): Promise<number> {
+    try {
+      return await this.redisClient.hDel(key, field);
+    } catch (error) {
+      this.logger.error(`Error in hDel(${key}, ${field}): ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
    * Pings the Redis server to check connectivity.
    */
   async ping(): Promise<string> {
