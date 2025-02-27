@@ -7,6 +7,7 @@ import { Socket, io } from 'socket.io-client';
 import axios from "axios";
 import { BlockService } from "src/block/block.service";
 import { ConsensusService } from "src/consensus/consensus.service";
+import { ConsensusMessageType } from "src/consensus/dto/create-consensus.dto";
 
 /**
  * Service responsible for validator node functionality in the blockchain network.
@@ -19,7 +20,8 @@ export class ValidatorService {
 
     // Current consensus state and validator information
     private consensusState: ConsensusState;
-    private myValidatorInfo: ValidatorInfo;
+    myValidatorInfo: ValidatorInfo;
+    private connectedPeers: Array<{ id: string, ip: string, role: string }> = [];
 
     // Authentication and connection-related properties
     private authenticated: boolean = false;
@@ -237,12 +239,67 @@ export class ValidatorService {
      * @returns A list of validators.
      */
     private async getValidatorsFromSeed(seedNode: string): Promise<ValidatorInfo[]> {
-        // Implement logic to fetch validators from the seed node via HTTP/WebSocket
-        /** 
-         * This would typically involve making an API call to the seed node
-         * to retrieve the current set of active validators
-         */
-        return [];
+        try {
+            this.logger.log(`Fetching validators from seed node: ${seedNode}`);
+
+            // First check if we're already authenticated
+            if (!this.authenticated || !this.authToken) {
+                this.logger.warn('Not authenticated, attempting to authenticate first');
+                await this.authenticateWithSeedNode();
+
+                // If authentication still failed, return empty array
+                if (!this.authenticated) {
+                    throw new Error('Authentication required to fetch validator list');
+                }
+            }
+
+            // Make HTTP request to the seed node's validator endpoint
+            const response = await axios.get(`${seedNode}/validators`, {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`,
+                    'X-Client-ID': this.clientId
+                }
+            });
+
+            if (!response.data || !Array.isArray(response.data.validators)) {
+                throw new Error('Invalid response format from seed node');
+            }
+
+            // Parse and validate the validator information received
+            const validators: ValidatorInfo[] = response.data.validators.map(v => ({
+                address: v.address,
+                stake: Number(v.stake) || 0,
+                reputation: Number(v.reputation) || 0,
+                lastActive: Number(v.lastActive) || Date.now(),
+                publicKey: v.publicKey,
+                status: this.validateStatus(v.status) ? v.status : ValidatorStatus.STANDBY
+            }));
+
+            this.logger.log(`Successfully retrieved ${validators.length} validators from seed node`);
+
+            // Also try to fetch via WebSocket for redundancy if socket is connected
+            if (this.socket && this.socket.connected) {
+                this.socket.emit('getValidators');
+
+                // Register a one-time listener for the response
+                this.socket.once('validatorList', (data) => {
+                    // Merge with existing list or update if newer
+                    this.compareAndUpdateValidators(validators, data.validators);
+                });
+            }
+
+            return validators;
+        } catch (error) {
+            this.logger.error(`Error fetching validators from seed node ${seedNode}: ${error.message}`);
+
+            // Try alternative method via block history if HTTP fails
+            try {
+                return await this.getValidatorsFromBlockchain();
+            } catch (fallbackError) {
+                this.logger.error(`Fallback method also failed: ${fallbackError.message}`);
+                return [];
+            }
+        }
     }
 
     /**
@@ -339,6 +396,20 @@ export class ValidatorService {
         }
     }
 
+    public getConnectedPeers(): Array<{ id: string, ip: string, role: string }> {
+        try {
+            // If we're not connected to the network, try to fetch peers via API if authenticated
+            if (this.connectedPeers.length === 0 && this.authenticated && this.authToken) {
+                this.requestPeerList();
+            }
+
+            return this.connectedPeers;
+        } catch (error) {
+            this.logger.error(`Error getting connected peers: ${error.message}`);
+            return [];
+        }
+    }
+
     /**
      * Checks if this validator is the leader for the current consensus round.
      * Uses a Delegated Proof of Stake (DPoS) algorithm to determine leadership.
@@ -401,5 +472,100 @@ export class ValidatorService {
             validator: this.myValidatorInfo.address,
             signature: this.signature.signMessage(proposedBlock.hash),
         });
+    }
+
+    /**
+     * Helper method to validate that a status value is a valid ValidatorStatus enum value
+     */
+    private validateStatus(status: any): boolean {
+        return Object.values(ValidatorStatus).includes(status);
+    }
+
+    /**
+     * Compares two validator lists and updates validators array with any additional validators
+     * or more up-to-date information from the second list.
+     */
+    private compareAndUpdateValidators(validators: ValidatorInfo[], newValidators: any[]): ValidatorInfo[] {
+        if (!Array.isArray(newValidators)) return validators;
+
+        // Create a map of existing validators for quick lookup
+        const validatorMap = new Map(validators.map(v => [v.address, v]));
+
+        for (const newVal of newValidators) {
+            if (!newVal.address || !newVal.publicKey) continue;
+
+            const existing = validatorMap.get(newVal.address);
+
+            if (!existing) {
+                // Add new validator
+                validators.push({
+                    address: newVal.address,
+                    stake: Number(newVal.stake) || 0,
+                    reputation: Number(newVal.reputation) || 0,
+                    lastActive: Number(newVal.lastActive) || Date.now(),
+                    publicKey: newVal.publicKey,
+                    status: this.validateStatus(newVal.status) ? newVal.status : ValidatorStatus.STANDBY
+                });
+            } else if (newVal.lastActive > existing.lastActive) {
+                // Update existing validator if data is more recent
+                existing.stake = Number(newVal.stake) || existing.stake;
+                existing.reputation = Number(newVal.reputation) || existing.reputation;
+                existing.lastActive = Number(newVal.lastActive);
+                existing.status = this.validateStatus(newVal.status) ? newVal.status : existing.status;
+            }
+        }
+
+        return validators;
+    }
+
+    /**
+     * Fallback method to extract validator list from recent blocks in case
+     * direct fetch from seed nodes fails.
+     */
+    private async getValidatorsFromBlockchain(): Promise<ValidatorInfo[]> {
+        this.logger.log('Attempting to fetch validators from blockchain history');
+
+        // Get last 10 blocks to extract validator information
+        const recentBlocks = await this.block.getRecentBlocks(10);
+        if (!recentBlocks || recentBlocks.length === 0) {
+            throw new Error('No blocks available to extract validator information');
+        }
+
+        const validatorMap = new Map<string, ValidatorInfo>();
+
+        // Extract validator information from block signatures
+        for (const block of recentBlocks) {
+            if (block.signatures && Array.isArray(block.signatures)) {
+                for (const sig of block.signatures) {
+                    if (!validatorMap.has(sig.validator)) {
+                        validatorMap.set(sig.validator, {
+                            address: sig.validator,
+                            publicKey: sig.publicKey || '',
+                            stake: 0,
+                            reputation: 0,
+                            lastActive: block.timestamp || Date.now(),
+                            status: ValidatorStatus.ACTIVE // Assume active if they signed blocks
+                        });
+                    }
+                }
+            }
+        }
+
+        this.logger.log(`Extracted ${validatorMap.size} validators from blockchain history`);
+        return Array.from(validatorMap.values());
+    }
+
+    private requestPeerList(): void {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('getPeers');
+
+            // Register a one-time listener for the response
+            this.socket.once('peerList', (data) => {
+                if (data && Array.isArray(data.peers)) {
+                    this.connectedPeers = data.peers;
+                    this.logger.log(`Updated peer list, ${this.connectedPeers.length} peers connected`);
+                }
+            });
+        }
     }
 }

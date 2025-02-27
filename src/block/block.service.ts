@@ -230,4 +230,40 @@ export class BlockService {
             )
             .digest('hex');
     }
+
+    /**
+     * Retrieves a specified number of recent blocks from the blockchain.
+     * @param count Number of recent blocks to retrieve
+     * @returns Array of recent blocks, ordered by decreasing height (newest first)
+     */
+    async getRecentBlocks(count: number = 10): Promise<any[]> {
+        try {
+            this.logger.log(`Retrieving ${count} recent blocks`);
+
+            // Get current blockchain height
+            const currentHeight = await this.getBlockHeight();
+            const blocks = [];
+
+            // Retrieve blocks starting from the most recent
+            for (let i = currentHeight; i > Math.max(0, currentHeight - count); i--) {
+                try {
+                    const blockHash = await this.redis.get(`${this.HEIGHT_KEY}:${i}`);
+                    if (blockHash) {
+                        const blockData = await this.redis.hGet(this.BLOCKS_KEY, blockHash);
+                        if (blockData) {
+                            blocks.push(JSON.parse(blockData));
+                        }
+                    }
+                } catch (err) {
+                    this.logger.warn(`Could not retrieve block at height ${i}: ${err.message}`);
+                }
+            }
+
+            this.logger.log(`Successfully retrieved ${blocks.length} recent blocks`);
+            return blocks;
+        } catch (error) {
+            this.logger.error(`Error retrieving recent blocks: ${error.message}`);
+            throw error;
+        }
+    }
 }
