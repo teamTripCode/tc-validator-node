@@ -238,7 +238,7 @@ export class ValidatorService {
      * @param seedNode - The URL of the seed node.
      * @returns A list of validators.
      */
-    private async getValidatorsFromSeed(seedNode: string): Promise<ValidatorInfo[]> {
+    public async getValidatorsFromSeed(seedNode: string): Promise<ValidatorInfo[]> {
         try {
             this.logger.log(`Fetching validators from seed node: ${seedNode}`);
 
@@ -396,6 +396,7 @@ export class ValidatorService {
         }
     }
 
+    
     public getConnectedPeers(): Array<{ id: string, ip: string, role: string }> {
         try {
             // If we're not connected to the network, try to fetch peers via API if authenticated
@@ -522,7 +523,7 @@ export class ValidatorService {
      * Fallback method to extract validator list from recent blocks in case
      * direct fetch from seed nodes fails.
      */
-    private async getValidatorsFromBlockchain(): Promise<ValidatorInfo[]> {
+    public async getValidatorsFromBlockchain(): Promise<ValidatorInfo[]> {
         this.logger.log('Attempting to fetch validators from blockchain history');
 
         // Get last 10 blocks to extract validator information

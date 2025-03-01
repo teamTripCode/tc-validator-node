@@ -11,6 +11,7 @@ import { RedisService } from "../redis/redis.service";
 import { ConsensusService } from "src/consensus/consensus.service";
 import { SignatureService } from "src/signature/signature.service";
 import { QueueService } from "src/queue/queue.service";
+import { ConsensusMessage } from "src/consensus/dto/create-consensus.dto";
 
 /**
  * ValidatorGateway handles WebSocket connections for validators, manages peer discovery,
@@ -150,6 +151,40 @@ export class ValidatorGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     // Add to processing queue
     await this.queue.enqueueConsensusMessage(message);
+  }
+
+  /**
+   * Retrieves all active validators from the connection pool.
+   * @returns An array of active validator objects with their addresses.
+   */
+  async getActiveValidators(): Promise<{ id: string; address: string }[]> {
+    try {
+      // Get all validator peers from Redis
+      const validatorPeers = await this.redisService.hGetAll('validatorPeers');
+
+      // Filter only connected validators
+      const activeValidators = [];
+
+      for (const [id, data] of Object.entries(validatorPeers)) {
+        // Check if the validator is still connected
+        if (this.connectedValidators.has(id)) {
+          // Retrieve validator address from Redis or another source
+          const validatorAddress = await this.redisService.get(`validator:${id}:address`);
+
+          if (validatorAddress) {
+            activeValidators.push({
+              id,
+              address: validatorAddress
+            });
+          }
+        }
+      }
+
+      return activeValidators;
+    } catch (error) {
+      this.logger.error(`Error getting active validators: ${error.message}`);
+      return [];
+    }
   }
 
   /**
