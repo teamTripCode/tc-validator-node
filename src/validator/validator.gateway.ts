@@ -32,16 +32,10 @@ export class ValidatorGateway implements OnGatewayConnection, OnGatewayDisconnec
    * @param redisService - Service for interacting with Redis to store validator peers.
    */
   constructor(
-    @Inject(RedisService)
     private readonly redisService: RedisService,
-
     @Inject(forwardRef(() => ConsensusService))
     private readonly consensus: ConsensusService,
-
-    @Inject(SignatureService)
     private readonly signature: SignatureService,
-
-    @Inject(QueueService)
     private readonly queue: QueueService
   ) { }
 

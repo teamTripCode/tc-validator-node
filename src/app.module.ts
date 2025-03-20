@@ -6,8 +6,9 @@ import { ConsensusModule } from './consensus/consensus.module';
 import { SignatureModule } from './signature/signature.module';
 import { StateModule } from './state/state.module';
 import { TripCoinModule } from './tripcoin/tripcoin.module';
-import { ValidatorModule } from './validator/validator.module';
 import { QueueModule } from './queue/queue.module';
+import { ValidatorGateway } from './validator/validator.gateway';
+import { RedisService } from './redis/redis.service';
 
 @Module({
   imports: [
@@ -16,10 +17,9 @@ import { QueueModule } from './queue/queue.module';
     SignatureModule,
     StateModule,
     TripCoinModule,
-    ValidatorModule,
     QueueModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, ValidatorGateway, RedisService],
 })
 export class AppModule {}
