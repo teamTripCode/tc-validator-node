@@ -13,9 +13,10 @@ import { ValidatorModule } from 'src/validator/validator.module';
     BlockModule,
     TripCoinModule,
     forwardRef(() => QueueModule),
-    forwardRef(() => ValidatorModule), // ← Usa forwardRef aquí
+    forwardRef(() => ValidatorModule),
   ],
   controllers: [ConsensusController],
   providers: [ConsensusService],
+  exports: [ConsensusService],
 })
 export class ConsensusModule {}

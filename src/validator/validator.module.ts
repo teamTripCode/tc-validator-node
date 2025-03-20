@@ -10,7 +10,7 @@ import { QueueModule } from 'src/queue/queue.module';
 
 @Module({
   imports: [
-    forwardRef(() => RedisModule),
+    RedisModule,
     forwardRef(() => ConsensusModule),
     SignatureModule,
     QueueModule
