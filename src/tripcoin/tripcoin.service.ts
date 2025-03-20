@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from 'src/redis/redis.service';
 import { StateService } from 'src/state/state.service';
 import { ValidatorGateway } from 'src/validator/validator.gateway';
-import { ValidatorService } from 'src/validator/validator.service';
 
 @Injectable()
 export class TripcoinService {

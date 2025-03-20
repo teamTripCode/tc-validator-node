@@ -8,10 +8,19 @@ import { SignatureModule } from './signature/signature.module';
 import { TripcoinService } from './tripcoin/tripcoin.service';
 import { QueueService } from './queue/queue.service';
 import { BlockchainService } from './blockchain/blockchain.service';
+import { StateModule } from './state/state.module';
+import { TripCoinModule } from './tripcoin/tripcoin.module';
+import { StateService } from './state/state.service';
 
 @Module({
-  imports: [RedisModule, ConsensusModule, SignatureModule],
+  imports: [
+    RedisModule,
+    ConsensusModule,
+    SignatureModule,
+    StateModule,
+    TripCoinModule,
+  ],
   controllers: [AppController],
-  providers: [AppService, ValidatorGateway, TripcoinService, QueueService, BlockchainService],
+  providers: [AppService, ValidatorGateway, TripcoinService, QueueService, BlockchainService, StateService],
 })
 export class AppModule {}
