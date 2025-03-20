@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { BlockService } from 'src/block/block.service';
 import { IBlock } from 'src/block/dto/block.dto';
 import { QueueService } from 'src/queue/queue.service';
@@ -44,7 +44,9 @@ export class ConsensusService {
     private readonly signature: SignatureService,
     private readonly block: BlockService,
     private readonly tripcoin: TripcoinService,
+    @Inject(forwardRef(() => QueueService))
     private readonly queue: QueueService,
+    @Inject(forwardRef(() => ValidatorGateway))
     private readonly gateway: ValidatorGateway,
     private readonly eventEmitter: EventEmitter2
   ) {

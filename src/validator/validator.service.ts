@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import { RedisService } from "src/redis/redis.service";
 import { ConsensusState, ValidatorInfo, ValidatorStatus } from "./dto/validator.dto";
 import { Interval } from "@nestjs/schedule";
@@ -40,6 +40,7 @@ export class ValidatorService {
         private readonly redis: RedisService,
         private readonly signature: SignatureService,
         private readonly block: BlockService,
+        @Inject(forwardRef(() => ConsensusService))
         private readonly consensus: ConsensusService
     ) {
         this.initializeValidator();

@@ -5,7 +5,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect
 } from "@nestjs/websockets";
-import { Logger } from "@nestjs/common";
+import { forwardRef, Inject, Logger } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { RedisService } from "../redis/redis.service";
 import { ConsensusService } from "src/consensus/consensus.service";
@@ -32,7 +32,9 @@ export class ValidatorGateway implements OnGatewayConnection, OnGatewayDisconnec
    * @param redisService - Service for interacting with Redis to store validator peers.
    */
   constructor(
+    @Inject(forwardRef(() => RedisService))
     private readonly redisService: RedisService,
+    @Inject(forwardRef(() => ConsensusService))
     private readonly consensus: ConsensusService,
     private readonly signature: SignatureService,
     private readonly queue: QueueService

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConsensusService } from 'src/consensus/consensus.service';
 import { ConsensusMessage } from 'src/consensus/dto/create-consensus.dto';
 import { RedisService } from 'src/redis/redis.service';
@@ -14,7 +14,9 @@ export class QueueService {
     private processingInterval = 50; // milisegundos entre procesamiento de lotes
 
     constructor(
+        @Inject(forwardRef(() => RedisService))
         private readonly redis: RedisService,
+        @Inject(forwardRef(() => ConsensusService))
         private readonly consensus: ConsensusService,
     ) { }
 
