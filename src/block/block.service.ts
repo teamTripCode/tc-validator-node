@@ -15,7 +15,7 @@ export class BlockService {
     private readonly PENDING_BLOCKS_KEY = 'blockchain:pending-blocks'; // Clave Redis para bloques pendientes
 
     constructor(private readonly redis: RedisService) {
-        this.fullNodeUrl = process.env.FULL_NODE_URL || 'http://localhost:3001';
+        this.fullNodeUrl = process.env.FULL_NODE || 'http://localhost:3001';
     }
 
     async getBlock(hash: string): Promise<any> {

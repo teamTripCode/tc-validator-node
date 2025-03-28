@@ -10,6 +10,7 @@ import { QueueModule } from './queue/queue.module';
 import { ValidatorGateway } from './validator/validator.gateway';
 import { RedisService } from './redis/redis.service';
 import { ValidatorModule } from './validator/validator.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { ValidatorModule } from './validator/validator.module';
     StateModule,
     TripCoinModule,
     QueueModule,
-    ValidatorModule
+    ValidatorModule,
+    ConfigModule.forRoot({ isGlobal: true }),
   ],
   controllers: [AppController],
   providers: [AppService, ValidatorGateway, RedisService],
