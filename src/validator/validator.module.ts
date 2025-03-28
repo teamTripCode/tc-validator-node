@@ -7,13 +7,17 @@ import { RedisModule } from '../redis/redis.module'; // Si usa Redis
 import { ConsensusModule } from 'src/consensus/consensus.module';
 import { SignatureModule } from 'src/signature/signature.module';
 import { QueueModule } from 'src/queue/queue.module';
+import { TripCoinModule } from 'src/tripcoin/tripcoin.module';
+import { BlockModule } from 'src/block/block.module';
 
 @Module({
   imports: [
     RedisModule,
     forwardRef(() => ConsensusModule),
     SignatureModule,
-    QueueModule
+    QueueModule,
+    forwardRef(() => TripCoinModule),
+    BlockModule,
   ],
   providers: [ValidatorGateway, ValidatorService],
   controllers: [ValidatorController],

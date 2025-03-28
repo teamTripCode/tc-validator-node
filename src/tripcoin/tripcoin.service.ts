@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { RedisService } from 'src/redis/redis.service';
 import { StateService } from 'src/state/state.service';
 import { ValidatorGateway } from 'src/validator/validator.gateway';
@@ -14,6 +14,7 @@ export class TripcoinService {
     constructor(
         private readonly redis: RedisService,
         private readonly state: StateService,
+        @Inject(forwardRef(() => ValidatorGateway))
         private readonly validators: ValidatorGateway,
     ) {
         this.initializeSupply();

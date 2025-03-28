@@ -9,6 +9,7 @@ import { TripCoinModule } from './tripcoin/tripcoin.module';
 import { QueueModule } from './queue/queue.module';
 import { ValidatorGateway } from './validator/validator.gateway';
 import { RedisService } from './redis/redis.service';
+import { ValidatorModule } from './validator/validator.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { RedisService } from './redis/redis.service';
     StateModule,
     TripCoinModule,
     QueueModule,
+    ValidatorModule
   ],
   controllers: [AppController],
   providers: [AppService, ValidatorGateway, RedisService],

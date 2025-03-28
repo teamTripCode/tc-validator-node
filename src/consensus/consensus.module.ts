@@ -6,6 +6,7 @@ import { SignatureModule } from 'src/signature/signature.module';
 import { TripCoinModule } from 'src/tripcoin/tripcoin.module';
 import { QueueModule } from 'src/queue/queue.module';
 import { ValidatorModule } from 'src/validator/validator.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ValidatorModule } from 'src/validator/validator.module';
     TripCoinModule,
     forwardRef(() => QueueModule),
     forwardRef(() => ValidatorModule),
+    EventEmitterModule.forRoot(),
   ],
   controllers: [ConsensusController],
   providers: [ConsensusService],
